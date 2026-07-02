@@ -5,30 +5,128 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
+  getSubscriptionsFeed,
   getUserSubscriptions,
   searchAll,
   type SearchResult,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { VideoItem } from "@/lib/types";
-import { clean } from "@/lib/utils";
+import {
+  channelAvatar,
+  clean,
+  fixCdn,
+  formatViews,
+  isShort,
+  timeAgo,
+} from "@/lib/utils";
 import { Spinner } from "@/components/Skeletons";
-import { VideoCard } from "@/components/cards";
 import { CollectionsBrowser } from "@/components/CollectionsBrowser";
 import { ClipsReel } from "@/components/ClipsReel";
 import { SearchIcon } from "@/components/Icons";
 import { Img } from "@/components/Img";
 
+const FOLLOWING_FILTERS = ["All", "Today", "Videos", "Clips"] as const;
+type FollowingFilter = (typeof FOLLOWING_FILTERS)[number];
+
+function isToday(value?: string | number | null): boolean {
+  const raw = Number(value ?? 0);
+  if (!raw) return false;
+  const unix = raw > 10_000_000_000 ? Math.floor(raw / 1000) : raw;
+  const d = new Date(unix * 1000);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
 const TABS = ["Following", "Search", "Collections", "Clips"] as const;
 type Tab = (typeof TABS)[number];
 
+function ChannelBubble({ channel }: { channel: any }) {
+  return (
+    <Link
+      href={`/channel/${channel.id}`}
+      className="flex w-[60px] shrink-0 flex-col items-center"
+    >
+      <Img
+        src={channelAvatar(channel)}
+        alt={clean(channel.channel)}
+        className="h-14 w-14 rounded-full border border-border bg-card object-cover"
+      />
+      <span className="mt-1.5 line-clamp-1 w-full text-center text-xs text-subtext">
+        {clean(channel.channel)}
+      </span>
+    </Link>
+  );
+}
+
+function FeedVideoCard({ item }: { item: any }) {
+  const clip = isShort(item);
+  const href = clip
+    ? `/browse?tab=clips&id=${item.id}`
+    : `/watch/${item.id}`;
+  const meta = [
+    clean(item.channel),
+    formatViews(item.numOfViews),
+    timeAgo(item.uploadtime),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <Link href={href} className="block">
+      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-card">
+        <Img
+          src={fixCdn(item.thumbnail)}
+          alt={clean(item.videos_title)}
+          className="h-full w-full object-cover"
+        />
+        {String(item.isLive) === "1" && (
+          <span className="absolute bottom-2 left-2 rounded bg-error px-1.5 py-0.5 text-[11px] font-bold text-white">
+            LIVE
+          </span>
+        )}
+        {clip && (
+          <span className="absolute bottom-2 right-2 rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-bold text-white">
+            CLIP
+          </span>
+        )}
+      </div>
+      <div className="mt-2.5 flex gap-2.5">
+        <Img
+          src={fixCdn(item.channel_image)}
+          alt={clean(item.channel)}
+          className="h-9 w-9 shrink-0 rounded-full bg-card object-cover"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-sm font-semibold leading-5">
+            {clean(item.videos_title)}
+          </p>
+          <p className="mt-1 truncate text-xs text-subtext">{meta}</p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 function FollowingTab() {
   const { token, isLoggedIn } = useAuth();
-  const { data, isLoading } = useQuery<VideoItem[]>({
-    queryKey: ["subscriptions", token],
-    queryFn: () => getUserSubscriptions(token),
+  const [filter, setFilter] = useState<FollowingFilter>("All");
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["following-page", token],
+    queryFn: async () => {
+      const [channels, feed] = await Promise.all([
+        getUserSubscriptions(token),
+        getSubscriptionsFeed(token),
+      ]);
+      return { channels, feed };
+    },
     enabled: isLoggedIn,
   });
+
   if (!isLoggedIn)
     return (
       <div className="p-8 text-center text-subtext">
@@ -41,20 +139,61 @@ function FollowingTab() {
         </Link>
       </div>
     );
+
   if (isLoading)
     return (
       <div className="flex justify-center p-10">
         <Spinner />
       </div>
     );
-  const items = Array.isArray(data) ? data : [];
-  if (!items.length)
-    return <p className="p-8 text-center text-subtext">No subscriptions yet.</p>;
+
+  const channels: any[] = Array.isArray(data?.channels) ? data!.channels : [];
+  const feed: any[] = Array.isArray(data?.feed) ? data!.feed : [];
+
+  const visibleFeed = feed.filter((item) => {
+    if (filter === "Today") return isToday(item.uploadtime);
+    if (filter === "Clips") return isShort(item);
+    if (filter === "Videos") return !isShort(item);
+    return true;
+  });
+
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-5 p-4">
-      {items.map((item, i) => (
-        <VideoCard key={i} item={item} width="100%" />
-      ))}
+    <div className="pb-4">
+      {channels.length > 0 && (
+        <div className="no-scrollbar flex gap-3.5 overflow-x-auto px-4 pt-3">
+          {channels.map((c, i) => (
+            <ChannelBubble key={`${c.id}-${i}`} channel={c} />
+          ))}
+        </div>
+      )}
+
+      <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 py-3">
+        {FOLLOWING_FILTERS.map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className="whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold"
+            style={{
+              background: filter === f ? "var(--text)" : "var(--card)",
+              color: filter === f ? "var(--background)" : "var(--subtext)",
+            }}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {visibleFeed.length === 0 ? (
+        <p className="p-8 text-center text-subtext">
+          No videos found for {filter}.
+        </p>
+      ) : (
+        <div className="space-y-6 px-4">
+          {visibleFeed.map((item, i) => (
+            <FeedVideoCard key={`${item.id}-${i}`} item={item} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

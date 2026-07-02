@@ -18,7 +18,7 @@ const TABS = [
     href: "/browse",
     label: "Browse",
     icon: BrowseIcon,
-    match: (p: string) => p.startsWith("/browse") || p.startsWith("/collections"),
+    match: (p: string) => p.startsWith("/browse") || p.startsWith("/collection"),
   },
 ] as const;
 

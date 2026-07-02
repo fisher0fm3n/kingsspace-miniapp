@@ -35,11 +35,19 @@ export function videoThumb(item: VideoItem): string {
 
 // The `d3c5pcohbexzc4.cloudfront.net` CDN is dead; the same assets are served
 // from cdnvideos.ceflix.org. Rewrite the host so avatars/thumbnails resolve.
-function fixCdn(url: string): string {
-  return url.replace(
+export function fixCdn(url: unknown): string {
+  return String(url ?? "").replace(
     "d3c5pcohbexzc4.cloudfront.net",
     "cdnvideos.ceflix.org",
   );
+}
+
+// Resolve a subscription channel object's avatar: explicit url, else prefix+file.
+export function channelAvatar(ch: any): string {
+  if (ch?.url) return fixCdn(ch.url);
+  if (ch?.urlprefix && ch?.filename)
+    return fixCdn(`${clean(ch.urlprefix)}${clean(ch.filename)}`);
+  return "";
 }
 
 export function channelThumb(item: any): string {

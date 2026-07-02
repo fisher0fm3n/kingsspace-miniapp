@@ -88,10 +88,10 @@ export default function ProfilePage() {
 
       <div className="flex gap-2 px-5">
         <Link
-          href="/upload"
-          className="flex-1 rounded-xl bg-card py-2.5 text-center text-sm font-bold"
+          href="/studio"
+          className="flex-1 rounded-xl bg-primary py-2.5 text-center text-sm font-bold text-white"
         >
-          Upload
+          Creator Studio
         </Link>
         <button
           onClick={() => {

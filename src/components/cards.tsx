@@ -35,7 +35,7 @@ export function VideoCard({
         <Thumb
           src={videoThumb(item)}
           alt={videoTitle(item)}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
         />
         {Number(item.isLive) === 1 && (
           <span className="absolute left-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-bold text-primary">

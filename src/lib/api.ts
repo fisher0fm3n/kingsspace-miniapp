@@ -65,12 +65,19 @@ export const getNewsPosts = async () => {
 export const getCollections = () =>
   ceflix("collections").then((j) => (Array.isArray(j?.data) ? j.data : []));
 
+// A collection resolves to { collection, sections }; each section drills into
+// collections/section/{id}/items which returns { collection, section, items }
+// where each item wraps a playlist with its videos.
 export const getCollection = (id: string) =>
-  ceflix(`collections/${id}`).then((j) => j?.data);
+  ceflix(`collections/${id}`).then((j) => ({
+    collection: j?.data?.collection ?? null,
+    sections: Array.isArray(j?.data?.sections) ? j.data.sections : [],
+  }));
 
-export const getCollectionItems = (id: string) =>
-  ceflix(`collections/${id}/items`).then((j) => ({
-    collection: j?.data?.collection,
+export const getCollectionSection = (id: string) =>
+  ceflix(`collections/section/${id}/items`).then((j) => ({
+    collection: j?.data?.collection ?? null,
+    section: j?.data?.section ?? null,
     items: Array.isArray(j?.data?.items) ? j.data.items : [],
   }));
 
@@ -245,6 +252,98 @@ export const createPlaylist = (
     token,
   });
 
+// --- Creator Studio -------------------------------------------------------
+
+export const getAccountStats = (token: string) =>
+  ceflix("accountstat", { method: "POST", body: { token }, token }).then(
+    (j) => j?.data ?? {},
+  );
+
+export const getUserChannels = (token: string) =>
+  ceflix("user/channels", { method: "POST", body: { token }, token }).then(
+    (j) => (Array.isArray(j?.data) ? j.data : []),
+  );
+
+export const getUserVideos = (token: string) =>
+  ceflix("user/videos", { method: "POST", body: { token }, token }).then(
+    (j) => (Array.isArray(j?.data) ? j.data : []),
+  );
+
+// Single channel with editable fields (channel, description, tags, cat_id).
+export const getUserChannel = (id: string | number, token: string) =>
+  ceflix("userchannel", {
+    method: "POST",
+    body: { channel: id, token },
+    token,
+  }).then((j) => j?.data ?? {});
+
+export const getChannelCategories = (token: string) =>
+  ceflix("channelcategories", { method: "POST", body: {}, token }).then((j) =>
+    Array.isArray(j?.data) ? j.data : [],
+  );
+
+export const createChannel = (
+  payload: {
+    category: string | number;
+    channel_title: string;
+    description: string;
+    tags: string;
+    thumbnail?: string; // data URL
+    cover?: string; // data URL
+  },
+  token: string,
+) =>
+  ceflix("channel/new", {
+    method: "POST",
+    body: { token, ...payload },
+    token,
+  });
+
+export const updateChannel = (
+  payload: {
+    channel: string | number;
+    channel_title: string;
+    description: string;
+    tags: string;
+    category: string | number;
+  },
+  token: string,
+) =>
+  ceflix("channel/update", {
+    method: "POST",
+    body: { token, ...payload },
+    token,
+  });
+
+export const deleteChannel = (channelId: string | number, token: string) =>
+  ceflix("channel/delete", {
+    method: "POST",
+    body: { channel: channelId, token },
+    token,
+  });
+
+export const updateVideo = (
+  payload: {
+    video: string | number;
+    video_title: string;
+    description: string;
+    tags: string;
+  },
+  token: string,
+) =>
+  ceflix("video/update", {
+    method: "POST",
+    body: { token, ...payload },
+    token,
+  });
+
+export const deleteVideo = (videoId: string | number, token: string) =>
+  ceflix("video/delete", {
+    method: "POST",
+    body: { video: videoId, token },
+    token,
+  });
+
 export const getUserProfile = (token: string) =>
   ceflix("user/profile", { method: "POST", body: { token }, token }).then(
     (j) => j?.data ?? j,
@@ -252,8 +351,16 @@ export const getUserProfile = (token: string) =>
 
 export const getUserSubscriptions = (token: string) =>
   ceflix("user/subscriptions", { method: "POST", body: { token }, token }).then(
-    (j) => j?.data ?? [],
+    (j) => (Array.isArray(j?.data) ? j.data : []),
   );
+
+// Videos feed from the channels the user follows (the Following tab list).
+export const getSubscriptionsFeed = (token: string) =>
+  ceflix("user/subscriptions/feed", {
+    method: "POST",
+    body: { token, page: 1 },
+    token,
+  }).then((j) => (Array.isArray(j?.data) ? j.data : []));
 
 export const getUserHistory = (token: string) =>
   ceflix("user/videos/history", {

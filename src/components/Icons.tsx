@@ -87,6 +87,56 @@ export const VolumeOffIcon = ({ size, ...p }: P) => (
   </svg>
 );
 
+export const EyeIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+export const TvIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <rect x="2" y="7" width="20" height="13" rx="2" />
+    <path d="m8 3 4 4 4-4" />
+  </svg>
+);
+
+export const UsersIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5" />
+    <path d="M16 5.5a3.5 3.5 0 0 1 0 6M18 20c0-2.8-1.3-4.3-3-4.8" />
+  </svg>
+);
+
+export const UploadIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <path d="M12 15V4M8 8l4-4 4 4" />
+    <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+  </svg>
+);
+
+export const TrashIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+  </svg>
+);
+
+export const EditIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+  </svg>
+);
+
+export const ImageIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <path d="m21 15-5-5L5 21" />
+  </svg>
+);
+
 export const PlaylistIcon = ({ size, ...p }: P) => (
   <svg {...base(size)} {...p}>
     <path d="M3 6h13M3 12h13M3 18h8M17 14v6M14 17h6" />
