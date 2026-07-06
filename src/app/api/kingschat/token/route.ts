@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // KingsChat OAuth2 token endpoint. No auth headers required — the client_id
 // identifies the application.
 const KC_TOKEN_URL = "https://connect.kingsch.at/developer/api/oauth2/token";
-const CLIENT_ID = "69ed97d6-8af7-4df8-8223-a35899b426e6";
+const CLIENT_ID = "f610b805-61ac-4a5f-811c-12e64c637a64";
 
 export async function POST(req: NextRequest) {
   let body: { code?: string } = {};

@@ -7,9 +7,20 @@ export const KINGSCHAT_CLIENT_ID = "com.kingschat";
 export const KINGSCHAT_SCOPES = ["conference_calls"];
 export const KINGSCHAT_AUTH_ENDPOINT = "https://accounts.kingsch.at/";
 
+// Public base URL of this app. Set NEXT_PUBLIC_APP_URL per environment
+// (e.g. http://localhost:3200 locally, https://your-domain.com in prod) so the
+// OAuth redirect_uri always matches what's registered in the KingsChat app.
+// Falls back to the browser's current origin when unset.
+export function getAppUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, "");
+  if (typeof window !== "undefined") return window.location.origin;
+  return "";
+}
+
 export function getRedirectUri(): string {
-  if (typeof window === "undefined") return "";
-  return `${window.location.origin}/auth/callback`;
+  const base = getAppUrl();
+  return base ? `${base}/auth/callback` : "";
 }
 
 export function buildAuthorizeUrl(): string {
