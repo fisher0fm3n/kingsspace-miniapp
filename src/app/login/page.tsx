@@ -1,19 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { buildAuthorizeUrl } from "@/lib/kingschat";
 import { PageHeader } from "@/components/PageHeader";
 import { Spinner } from "@/components/Skeletons";
+import type { CurrentUser } from "@/lib/types";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signInWithPassword } = useAuth();
+  const { signInWithPassword, setSession } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type !== "kingschat-login-success") return;
+      const token = String(event.data?.token || "");
+      const user = (event.data?.user || {}) as CurrentUser;
+      if (!token) return;
+      setSession(token, { ...user, token });
+      router.replace("/profile");
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [router, setSession]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +45,17 @@ export default function LoginPage() {
     }
   };
 
+  const openKingsChatLogin = () => {
+    const popup = window.open(
+      "/auth/kingschat-popup",
+      "kingschat-login",
+      "width=480,height=760,scrollbars=yes,resizable=yes",
+    );
+    if (!popup) {
+      window.location.href = buildAuthorizeUrl();
+    }
+  };
+
   return (
     <div>
       <PageHeader title="Log in" />
@@ -41,9 +68,7 @@ export default function LoginPage() {
         </div>
 
         <button
-          onClick={() => {
-            window.location.href = buildAuthorizeUrl();
-          }}
+          onClick={openKingsChatLogin}
           className="mb-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1f8fff] py-3 font-bold text-white"
         >
           Continue with KingsChat
@@ -79,6 +104,21 @@ export default function LoginPage() {
             {loading ? <Spinner size={18} /> : "Log in"}
           </button>
         </form>
+
+        <p className="mt-6 text-center text-xs text-subtext">
+          By continuing you agree to the{" "}
+          <Link href="/legal/terms" className="font-semibold text-primary">
+            Terms of Use
+          </Link>{" "}
+          and{" "}
+          <Link href="/legal/privacy" className="font-semibold text-primary">
+            Privacy Policy
+          </Link>
+          .{" "}
+          <Link href="/support" className="font-semibold text-primary">
+            Contact &amp; Support
+          </Link>
+        </p>
       </div>
     </div>
   );

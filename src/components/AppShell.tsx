@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { KC_AUTH_CODE_KEY } from "@/lib/kingschat";
+import { stripAuthParamsFromLocation } from "@/lib/scrub";
+import { syncBlockedFromServer } from "@/lib/blocklist";
 import {
   HomeIcon,
   BrowseIcon,
   PlusIcon,
   PersonIcon,
-  BotIcon,
+  GridIcon,
 } from "./Icons";
 import { Img } from "./Img";
 
@@ -18,16 +22,16 @@ const TABS = [
     href: "/browse",
     label: "Browse",
     icon: BrowseIcon,
-    match: (p: string) => p.startsWith("/browse") || p.startsWith("/collection"),
+    match: (p: string) => p.startsWith("/browse"),
   },
 ] as const;
 
 const TABS_RIGHT = [
   {
-    href: "/kingsbot",
-    label: "KingsBot",
-    icon: BotIcon,
-    match: (p: string) => p.startsWith("/kingsbot"),
+    href: "/collections",
+    label: "Collections",
+    icon: GridIcon,
+    match: (p: string) => p.startsWith("/collection"),
   },
   {
     href: "/profile",
@@ -46,8 +50,35 @@ function isImmersive(path: string) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const router = useRouter();
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, token } = useAuth();
   const immersive = isImmersive(pathname);
+
+  // Hydrate the local block-list cache from the server once signed in, so
+  // blocks sync across devices (the server is authoritative for logged-in
+  // users; see lib/blocklist).
+  useEffect(() => {
+    if (token) syncBlockedFromServer(token);
+  }, [token]);
+
+  // KingsChat (authRequired == true) launches the miniapp with a temporary
+  // `authCode` on the URL — on whatever path it opens. SECURITY: strip it from
+  // the address bar immediately (success and failure paths alike) and hand it
+  // to /auth/callback via sessionStorage, never by re-embedding it in a URL.
+  // The callback page exchanges it server-side for a KingsSpace session.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authCode = params.get("authCode") || params.get("code");
+    if (!authCode) return;
+    stripAuthParamsFromLocation();
+    if (window.location.pathname.startsWith("/auth/callback")) return;
+    try {
+      sessionStorage.setItem(KC_AUTH_CODE_KEY, authCode);
+    } catch {
+      /* sessionStorage unavailable — user can still log in manually */
+    }
+    router.replace("/auth/callback");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col bg-background shadow-[0_0_60px_rgba(0,0,0,0.6)] sm:border-x sm:border-border">

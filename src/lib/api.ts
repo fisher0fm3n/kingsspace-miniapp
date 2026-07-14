@@ -87,10 +87,18 @@ export const getVideo = (id: string | number, token?: string | null) => {
   return ceflix("video", { method: "POST", body, token }).then((j) => j?.data);
 };
 
-export const getComments = (id: string | number, page = 0, perPage = 20) =>
+export const getComments = (
+  id: string | number,
+  page = 0,
+  perPage = 20,
+  token?: string | null,
+) =>
   ceflix(`video/comments?page=${page}&per_page=${perPage}`, {
     method: "POST",
-    body: { video: Number(id) },
+    // Passing the viewer token lets the backend hide comments from users the
+    // viewer has blocked (server-side enforcement of the block list).
+    body: token ? { video: Number(id), token } : { video: Number(id) },
+    token: token ?? null,
   }).then((j) => ({
     comments: Array.isArray(j?.data) ? j.data : [],
     pagination: j?.pagination || null,
@@ -252,6 +260,44 @@ export const createPlaylist = (
     token,
   });
 
+// --- Block list (server-backed, mirrors local cache in lib/blocklist) ------
+
+export const blockContent = (
+  kind: "user" | "channel",
+  blockedId: string | number,
+  token: string,
+) =>
+  ceflix("user/block", {
+    method: "POST",
+    body: { token, kind, blocked: String(blockedId) },
+    token,
+  });
+
+export const unblockContent = (
+  kind: "user" | "channel",
+  blockedId: string | number,
+  token: string,
+) =>
+  ceflix("user/unblock", {
+    method: "POST",
+    body: { token, kind, blocked: String(blockedId) },
+    token,
+  });
+
+export const getBlockedContent = (token: string) =>
+  ceflix("user/blocks", { method: "POST", body: { token }, token }).then((j) =>
+    Array.isArray(j?.data) ? j.data : [],
+  );
+
+// --- Account deletion ------------------------------------------------------
+
+// Starts the in-app deletion request on the backend (deactivates the account,
+// hides channels, queues owner processing). The Next.js /api/account/delete-
+// request route calls CeFlix /user/delete-request directly, so this helper is
+// provided for completeness / non-proxied callers.
+export const requestAccountDeletion = (token: string) =>
+  ceflix("user/delete-request", { method: "POST", body: { token }, token });
+
 // --- Creator Studio -------------------------------------------------------
 
 export const getAccountStats = (token: string) =>
@@ -308,17 +354,21 @@ export const updateChannel = (
     category: string | number;
   },
   token: string,
-) =>
-  ceflix("channel/update", {
+) => {
+  const { channel, ...rest } = payload;
+  return ceflix("channel/update", {
     method: "POST",
-    body: { token, ...payload },
+    // Backend (ChannelController::updateChannel) validates `channel_id`.
+    body: { token, channel_id: channel, channel, ...rest },
     token,
   });
+};
 
 export const deleteChannel = (channelId: string | number, token: string) =>
   ceflix("channel/delete", {
     method: "POST",
-    body: { channel: channelId, token },
+    // Backend (MediaController::deleteChannel) validates `channel_id`.
+    body: { channel_id: channelId, channel: channelId, token },
     token,
   });
 
@@ -330,17 +380,25 @@ export const updateVideo = (
     tags: string;
   },
   token: string,
-) =>
-  ceflix("video/update", {
+) => {
+  const { video, ...rest } = payload;
+  return ceflix("video/update", {
     method: "POST",
-    body: { token, ...payload },
+    // Backend (VideoController::updateVideoDetails) validates `video_id`.
+    body: { token, video_id: video, video, ...rest },
     token,
   });
+};
 
-export const deleteVideo = (videoId: string | number, token: string) =>
+export const deleteVideo = (
+  videoId: string | number,
+  channelId: string | number,
+  token: string,
+) =>
   ceflix("video/delete", {
     method: "POST",
-    body: { video: videoId, token },
+    // Backend (MediaController::deleteVideo) validates `channel_id` + `video`.
+    body: { video: videoId, channel_id: channelId, token },
     token,
   });
 

@@ -11,6 +11,13 @@ export const ASK_API = `${NMT_API}/kingsspace/search/ask`;
 // External + internal search.
 export const EXTERNAL_VIDEO_SEARCH_API = `${NMT_API}/kingsspace/search/external/videos`;
 
+// Support / legal contact for the service (Contact page, deletion requests,
+// abuse reports). TODO(owner): confirm this is the monitored mailbox before
+// KingsChat onboarding review.
+export const SUPPORT_EMAIL = "support@ceflix.org";
+// Target first-response time communicated to users (see docs/MODERATION.md).
+export const SUPPORT_RESPONSE_TIME = "48 hours";
+
 // LocalStorage keys (web equivalent of expo-secure-store keys).
 export const STORAGE_KEYS = {
   token: "kingsspace.token",

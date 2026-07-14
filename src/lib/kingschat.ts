@@ -1,11 +1,22 @@
 // KingsChat OAuth (web). Mirrors services/kingschat.ts from the RN app.
-// The RN app used clientId "com.kingschat", scope "conference_calls" against
-// accounts.kingsch.at. For web we use the implicit flow and read the returned
-// access token from the redirect URL fragment, then exchange it server-side.
+//
+// SECURITY NOTES (KingsChat Services onboarding, authRequired == true):
+// - The temporary authCode passed on the launch URL is exchanged SERVER-SIDE
+//   only (via /api/kingschat/token). It must never be logged, never re-embedded
+//   in a URL, and must be stripped from the address bar on success AND failure
+//   (see src/lib/scrub.ts).
+// - Auth codes, access tokens and refresh tokens must never appear in
+//   console output, error messages, or telemetry.
 
-export const KINGSCHAT_CLIENT_ID = "com.kingschat";
-export const KINGSCHAT_SCOPES = ["conference_calls"];
-export const KINGSCHAT_AUTH_ENDPOINT = "https://accounts.kingsch.at/";
+// KingsSpace's developer client ID — the same one /api/kingschat/token uses to
+// exchange the authCode. clientId is public (it only identifies the app).
+export const KINGSCHAT_CLIENT_ID = "f610b805-61ac-4a5f-811c-12e64c637a64";
+export const KINGSCHAT_AUTH_ENDPOINT =
+  "https://accounts.kingschat.online/log-in";
+
+// sessionStorage key used to hand the launch authCode from the entry page to
+// /auth/callback without putting it back on a URL.
+export const KC_AUTH_CODE_KEY = "kingsspace.kc_auth_code";
 
 // Public base URL of this app. Set NEXT_PUBLIC_APP_URL per environment
 // (e.g. http://localhost:3200 locally, https://your-domain.com in prod) so the
@@ -18,18 +29,15 @@ export function getAppUrl(): string {
   return "";
 }
 
-export function getRedirectUri(): string {
-  const base = getAppUrl();
-  return base ? `${base}/auth/callback` : "";
-}
-
+// Manual login uses the new KingsChat accounts URL:
+//   https://accounts.kingschat.online/log-in?clientId=<developer client id>
+// No redirect_uri/scopes params — the redirect is registered against the
+// clientId in the KingsChat developer portal. After login, KingsChat sends the
+// user back with an `authCode` on the URL, which flows through the same path
+// as a KingsChat superapp launch (AppShell → /auth/callback →
+// /api/kingschat/token).
 export function buildAuthorizeUrl(): string {
-  const params = new URLSearchParams({
-    client_id: KINGSCHAT_CLIENT_ID,
-    scopes: JSON.stringify(KINGSCHAT_SCOPES),
-    redirect_uri: getRedirectUri(),
-    response_type: "token",
-  });
+  const params = new URLSearchParams({ clientId: KINGSCHAT_CLIENT_ID });
   return `${KINGSCHAT_AUTH_ENDPOINT}?${params.toString()}`;
 }
 
@@ -40,6 +48,21 @@ export async function exchangeKingsChatAuthCode(code: string) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ code }),
+  });
+  const json = await res.json();
+  if (!json?.status) throw new Error(json?.message || "KingsChat login failed");
+  return json as { token: string; user: Record<string, unknown> };
+}
+
+// Complete a manual "Continue with KingsChat" login: accounts.kingsch.at
+// POSTed the tokens to /api/kingschat/callback, which parked them in httpOnly
+// cookies. /api/kingschat/exchange reads them from those cookies, so no token
+// ever touches client-side code or a URL.
+export async function exchangeKingsChatPostedTokens() {
+  const res = await fetch("/api/kingschat/exchange", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
   });
   const json = await res.json();
   if (!json?.status) throw new Error(json?.message || "KingsChat login failed");

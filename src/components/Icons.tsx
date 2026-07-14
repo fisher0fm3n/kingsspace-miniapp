@@ -170,6 +170,15 @@ export const BotIcon = ({ size, ...p }: P) => (
   </svg>
 );
 
+export const GridIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+  </svg>
+);
+
 export const CheckIcon = ({ size, ...p }: P) => (
   <svg {...base(size)} {...p}>
     <path d="M20 6 9 17l-5-5" />

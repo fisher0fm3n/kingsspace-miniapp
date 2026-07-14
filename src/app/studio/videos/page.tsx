@@ -28,11 +28,11 @@ export default function StudioVideos() {
     enabled: isLoggedIn,
   });
 
-  const onDelete = async (id: string | number) => {
+  const onDelete = async (id: string | number, channelId: string | number) => {
     if (!confirm("Delete this video? This cannot be undone.")) return;
     setBusyId(id);
     try {
-      await deleteVideo(id, token);
+      await deleteVideo(id, channelId, token);
       qc.setQueryData<any[]>(["user-videos", token], (prev) =>
         (prev || []).filter((v) => String(v.id) !== String(id)),
       );
@@ -105,7 +105,7 @@ export default function StudioVideos() {
                     <EditIcon size={14} /> Edit
                   </Link>
                   <button
-                    onClick={() => onDelete(v.id)}
+                    onClick={() => onDelete(v.id, v.channel_id)}
                     disabled={busyId === v.id}
                     className="flex items-center gap-1 rounded-lg bg-card px-3 py-1.5 text-xs font-semibold text-error disabled:opacity-50"
                   >

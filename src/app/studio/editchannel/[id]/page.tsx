@@ -2,13 +2,14 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getChannelCategories,
   getUserChannel,
   updateChannel,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { moderateFields } from "@/lib/moderation";
 import { clean } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { Spinner } from "@/components/Skeletons";
@@ -20,6 +21,7 @@ export default function EditChannel({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const qc = useQueryClient();
   const { token, isLoggedIn, loading } = useAuth();
 
   const [name, setName] = useState("");
@@ -63,6 +65,13 @@ export default function EditChannel({
       return setError("Please enter a channel name and description.");
     if (!category) return setError("Please select a category.");
 
+    const screened = moderateFields({
+      "channel name": name,
+      description,
+      tags,
+    });
+    if (!screened.ok) return setError(screened.message);
+
     setSaving(true);
     try {
       await updateChannel(
@@ -75,6 +84,10 @@ export default function EditChannel({
         },
         token,
       );
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["user-channels"] }),
+        qc.invalidateQueries({ queryKey: ["channel", id] }),
+      ]);
       router.replace("/studio/channels");
     } catch (err) {
       setError((err as Error).message || "Unable to update channel.");

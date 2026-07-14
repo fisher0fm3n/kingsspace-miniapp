@@ -13,6 +13,13 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import {
+  block,
+  commentAuthorId,
+  commentAuthorName,
+  isBlocked,
+} from "@/lib/blocklist";
+import { moderateText } from "@/lib/moderation";
+import {
   channelThumb,
   clean,
   formatViews,
@@ -52,13 +59,46 @@ export default function WatchPage({
   });
 
   const { data: commentsData, refetch: refetchComments } = useQuery({
-    queryKey: ["comments", id],
-    queryFn: () => getComments(id),
+    queryKey: ["comments", id, token],
+    queryFn: () => getComments(id, 0, 20, token || null),
   });
 
   const video = data?.video;
-  const upNext = Array.isArray(data?.upnext) ? data.upnext : [];
-  const comments = commentsData?.comments || [];
+  // Re-evaluated whenever the local blocklist changes (block/unblock actions).
+  const [blockVersion, setBlockVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setBlockVersion((v) => v + 1);
+    window.addEventListener("kingsspace:blocklist", bump);
+    return () => window.removeEventListener("kingsspace:blocklist", bump);
+  }, []);
+
+  const upNext = useMemo(() => {
+    void blockVersion;
+    const list = Array.isArray(data?.upnext) ? data.upnext : [];
+    return list.filter(
+      (item: any) => !isBlocked("channel", item.channel_id || item.channelId),
+    );
+  }, [data, blockVersion]);
+
+  const comments = useMemo(() => {
+    void blockVersion;
+    const list = commentsData?.comments || [];
+    return list.filter((c: any) => !isBlocked("user", commentAuthorId(c)));
+  }, [commentsData, blockVersion]);
+
+  const onBlockCommenter = (c: any) => {
+    const authorId = commentAuthorId(c);
+    if (!authorId) return;
+    const name = commentAuthorName(c);
+    if (
+      window.confirm(
+        `Block ${name}? You will no longer see their comments. You can unblock them from Profile → Blocked users.`,
+      )
+    ) {
+      block("user", authorId, name, token || undefined);
+      refetchComments();
+    }
+  };
 
   const [liked, setLiked] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
@@ -130,6 +170,13 @@ export default function WatchPage({
     if (!isLoggedIn) return router.push("/login");
     const text = commentText.trim();
     if (!text) return;
+    // First-line objectionable-content screen; backend moderation and the
+    // report queue remain authoritative (docs/MODERATION.md).
+    const screened = moderateText(text, "comment");
+    if (!screened.ok) {
+      window.alert(screened.message);
+      return;
+    }
     setPosting(true);
     try {
       await addComment(id, text, token);
@@ -334,7 +381,7 @@ export default function WatchPage({
                 src={c.profile_pic || c.image || channelThumb(video)}
                 className="h-8 w-8 shrink-0 rounded-full bg-card object-cover"
               />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-subtext">
                   {clean(c.name || c.username || c.fname || "User")}{" "}
                   <span className="font-normal">
@@ -343,6 +390,13 @@ export default function WatchPage({
                 </p>
                 <p className="text-sm">{clean(c.comment || c.body)}</p>
               </div>
+              <button
+                onClick={() => onBlockCommenter(c)}
+                className="shrink-0 self-start text-xs font-semibold text-subtext"
+                aria-label={`Block ${commentAuthorName(c)}`}
+              >
+                Block
+              </button>
             </div>
           ))}
           {comments.length === 0 && (

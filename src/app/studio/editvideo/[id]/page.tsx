@@ -2,9 +2,10 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getVideo, updateVideo } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { moderateFields } from "@/lib/moderation";
 import { clean } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { Spinner } from "@/components/Skeletons";
@@ -16,6 +17,7 @@ export default function EditVideo({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const qc = useQueryClient();
   const { token, isLoggedIn, loading } = useAuth();
 
   const [name, setName] = useState("");
@@ -47,6 +49,13 @@ export default function EditVideo({
     setError("");
     if (!name.trim()) return setError("Please enter a video title.");
 
+    const screened = moderateFields({
+      title: name,
+      description,
+      tags,
+    });
+    if (!screened.ok) return setError(screened.message);
+
     setSaving(true);
     try {
       await updateVideo(
@@ -58,6 +67,13 @@ export default function EditVideo({
         },
         token,
       );
+      // Refresh the cached studio list + this video's detail so the new title
+      // shows immediately instead of after a manual refresh.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["user-videos"] }),
+        qc.invalidateQueries({ queryKey: ["video", id] }),
+        qc.invalidateQueries({ queryKey: ["edit-video", id] }),
+      ]);
       router.replace("/studio/videos");
     } catch (err) {
       setError((err as Error).message || "Unable to update video.");

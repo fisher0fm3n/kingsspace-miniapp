@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { createChannel, getChannelCategories } from "@/lib/api";
+import { moderateFields } from "@/lib/moderation";
 import { useAuth } from "@/lib/auth";
 import { clean } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
@@ -95,6 +96,13 @@ export default function CreateChannel() {
     if (!category) return setError("Please select a category.");
     if (!thumbnail) return setError("Please choose a channel thumbnail.");
     if (!cover) return setError("Please choose a cover image.");
+
+    const screened = moderateFields({
+      "channel name": name,
+      description,
+      tags,
+    });
+    if (!screened.ok) return setError(screened.message);
 
     setSubmitting(true);
     try {

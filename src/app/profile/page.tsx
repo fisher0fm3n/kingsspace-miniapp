@@ -120,6 +120,33 @@ export default function ProfilePage() {
         ))}
       </div>
 
+      {/* Settings & legal — reachable in-service links required for
+          KingsChat Services onboarding. */}
+      <div className="mx-5 mt-4 divide-y divide-border rounded-xl border border-border bg-card text-sm">
+        {[
+          { href: "/settings/blocked", label: "Blocked users & channels" },
+          { href: "/legal/privacy", label: "Privacy Policy" },
+          { href: "/legal/terms", label: "Terms of Use" },
+          { href: "/support", label: "Contact & Support" },
+        ].map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className="flex items-center justify-between px-4 py-3"
+          >
+            <span>{l.label}</span>
+            <span className="text-subtext">›</span>
+          </Link>
+        ))}
+        <Link
+          href="/settings/delete-account"
+          className="flex items-center justify-between px-4 py-3 text-error"
+        >
+          <span>Delete account &amp; data</span>
+          <span className="text-subtext">›</span>
+        </Link>
+      </div>
+
       {isFetching ? (
         <div className="flex justify-center p-10">
           <Spinner />

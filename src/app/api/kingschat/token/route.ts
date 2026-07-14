@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { APPLICATION_KEY, CEFLIX_API } from "@/lib/config";
+import { KINGSCHAT_CLIENT_ID } from "@/lib/kingschat";
 
 // KingsChat launches the miniapp with an `authCode` on the URL. This route
 // exchanges that authorization code for KingsChat access/refresh tokens, then
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 // KingsChat OAuth2 token endpoint. No auth headers required — the client_id
 // identifies the application.
 const KC_TOKEN_URL = "https://connect.kingsch.at/developer/api/oauth2/token";
-const CLIENT_ID = "f610b805-61ac-4a5f-811c-12e64c637a64";
+const CLIENT_ID = KINGSCHAT_CLIENT_ID;
 
 export async function POST(req: NextRequest) {
   let body: { code?: string } = {};
@@ -41,15 +42,15 @@ export async function POST(req: NextRequest) {
       cache: "no-store",
     });
 
+    // SECURITY: never log or echo the token response — it contains the
+    // access/refresh tokens (and the request contains the auth code).
     const tokenRaw = await tokenResp.text();
-    console.log(tokenRaw)
     let tokenJson: any = null;
     try {
       tokenJson = JSON.parse(tokenRaw);
     } catch {
       tokenJson = null;
     }
-    console.log("[kc/token] oauth2/token status:", tokenResp.status, tokenRaw);
 
     const accessToken = tokenJson?.access_token ?? null;
     const refreshToken = tokenJson?.refresh_token ?? null;
@@ -63,7 +64,6 @@ export async function POST(req: NextRequest) {
             tokenJson?.error ||
             tokenJson?.message ||
             "Failed to exchange KingsChat authCode for tokens.",
-          raw: tokenJson ?? tokenRaw,
         },
         { status: tokenResp.status || 502 },
       );

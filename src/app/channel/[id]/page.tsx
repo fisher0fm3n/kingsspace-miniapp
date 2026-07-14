@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getChannel, subscribeChannel } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { block, isBlocked, unblock } from "@/lib/blocklist";
 import { clean, formatViews, timeAgo, videoThumb, videoTitle } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { Spinner } from "@/components/Skeletons";
@@ -27,6 +28,40 @@ export default function ChannelPage({
 
   const [subscribed, setSubscribed] = useState(false);
   useEffect(() => setSubscribed(Boolean(data?.isSubscribed)), [data]);
+
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => setBlocked(isBlocked("channel", id)), [id]);
+
+  // The channel detail response nests the channel model under `data.channel`
+  // (the display name is data.channel.channel). Reading data.channel directly
+  // renders "[object Object]". Extract defensively so it still works if a
+  // flatter shape is ever returned.
+  const ch = (
+    data?.channel && typeof data.channel === "object" ? data.channel : {}
+  ) as Record<string, any>;
+  const channelName = clean(
+    ch.channel ||
+      ch.name ||
+      (typeof data?.channel === "string" ? data.channel : "") ||
+      data?.name ||
+      "Channel",
+  );
+
+  const onToggleBlock = () => {
+    if (blocked) {
+      unblock("channel", id, token || undefined);
+      setBlocked(false);
+      return;
+    }
+    if (
+      window.confirm(
+        "Block this channel? Its videos will be hidden from your feeds. You can unblock it from Profile → Blocked users.",
+      )
+    ) {
+      block("channel", id, channelName, token || undefined);
+      setBlocked(true);
+    }
+  };
 
   const onSubscribe = async () => {
     if (!isLoggedIn) return router.push("/login");
@@ -59,9 +94,19 @@ export default function ChannelPage({
     );
 
   const videos = Array.isArray(data.videos) ? data.videos : [];
-  const cover = data.cover || data.cover_image || data.banner;
+  const cover = ch.cover || data.cover || data.cover_image || data.banner;
   const avatar =
-    data.channel_thumbnail || data.channel_image || data.thumbnail || data.image;
+    ch.url ||
+    ch.channel_thumbnail ||
+    ch.thumbnail ||
+    ch.image ||
+    data.channel_thumbnail ||
+    data.channel_image ||
+    data.thumbnail ||
+    data.image;
+  const description = ch.description || data.description;
+  const isVerified = Number(ch.isVerified ?? data.isVerified) === 1;
+  const subscribers = data.subscribers ?? ch.subscribers ?? ch.subscriber_count;
 
   return (
     <div className="pb-8">
@@ -78,17 +123,15 @@ export default function ChannelPage({
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">
-            <h1 className="truncate text-lg font-bold">
-              {clean(data.channel || data.name)}
-            </h1>
-            {Number(data.isVerified) === 1 && (
+            <h1 className="truncate text-lg font-bold">{channelName}</h1>
+            {isVerified && (
               <VerifiedIcon size={16} className="text-primary" />
             )}
           </div>
           <p className="text-xs text-subtext">
             {[
-              data.subscribers != null
-                ? `${formatViews(data.subscribers).replace(" views", "")} subscribers`
+              subscribers != null
+                ? `${formatViews(subscribers).replace(" views", "")} subscribers`
                 : null,
               videos.length ? `${videos.length} videos` : null,
             ]
@@ -108,12 +151,28 @@ export default function ChannelPage({
         </button>
       </div>
 
-      {data.description && (
-        <p className="whitespace-pre-line px-4 py-3 text-sm text-subtext">
-          {clean(data.description)}
+      <div className="px-4 pt-2">
+        <button
+          onClick={onToggleBlock}
+          className="text-xs font-semibold text-subtext underline"
+        >
+          {blocked ? "Unblock channel" : "Block channel"}
+        </button>
+      </div>
+
+      {blocked && (
+        <p className="px-4 py-6 text-center text-sm text-subtext">
+          You blocked this channel. Its videos are hidden from your feeds.
         </p>
       )}
 
+      {description && (
+        <p className="whitespace-pre-line px-4 py-3 text-sm text-subtext">
+          {clean(description)}
+        </p>
+      )}
+
+      {!blocked && (
       <div className="mt-2 grid grid-cols-1 gap-4 p-4">
         {videos.map((v: any, i: number) => (
           <Link key={`${v.id}-${i}`} href={`/watch/${v.id}`} className="block">
@@ -138,6 +197,7 @@ export default function ChannelPage({
           <p className="text-center text-sm text-subtext">No videos yet.</p>
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getHome, getNewsPosts } from "@/lib/api";
 import type { HomePayload, HomeSection, Station, VideoItem } from "@/lib/types";
 import { clean, shuffle } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
+import { isBlocked } from "@/lib/blocklist";
 import { HomeSkeleton } from "@/components/Skeletons";
 import {
   ClipCard,
@@ -94,19 +94,6 @@ type MixedSection = {
 
 export default function HomePage() {
   const { isLoggedIn } = useAuth();
-  const router = useRouter();
-
-  // KingsChat launches the miniapp with an `authCode` on the URL. Hand it off
-  // to the callback page, which exchanges it for a KingsSpace session.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const authCode = params.get("authCode") || params.get("code");
-    if (authCode) {
-      router.replace(
-        `/auth/callback?authCode=${encodeURIComponent(authCode)}`,
-      );
-    }
-  }, [router]);
 
   const { data: payload, isLoading, error, refetch, isFetching } =
     useQuery<HomePayload>({ queryKey: ["home"], queryFn: getHome });
@@ -137,13 +124,23 @@ export default function HomePage() {
   );
 
   const mixed = useMemo<MixedSection[]>(() => {
+    // Hide videos from channels the user has blocked (Profile → Blocked).
+    const notBlocked = (item: VideoItem) =>
+      !isBlocked("channel", item.channel_id || item.channelId);
     const sections: HomeSection[] = Array.isArray(payload?.sections)
-      ? payload!.sections.filter((s) => Array.isArray(s.data) && s.data.length)
+      ? payload!.sections
+          .map((s) => ({
+            ...s,
+            data: Array.isArray(s.data) ? s.data.filter(notBlocked) : [],
+          }))
+          .filter((s) => s.data.length)
       : [];
     if (!sections.length) return [];
 
-    const ceclips = Array.isArray(payload?.ceclips) ? payload!.ceclips : [];
-    const recommended = payload?.recommended?.data || [];
+    const ceclips = (
+      Array.isArray(payload?.ceclips) ? payload!.ceclips : []
+    ).filter(notBlocked);
+    const recommended = (payload?.recommended?.data || []).filter(notBlocked);
     const posts = shuffle(newsPosts);
     let pi = 0;
     const out: MixedSection[] = [];

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getUserChannels } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useIsKingsChatWebView } from "@/lib/kcwebview";
+import { moderateFields } from "@/lib/moderation";
 import { channelAvatar, clean } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { Spinner } from "@/components/Skeletons";
@@ -15,6 +17,9 @@ import { UploadIcon, ImageIcon } from "@/components/Icons";
 export default function UploadPage() {
   const router = useRouter();
   const { token, isLoggedIn, loading } = useAuth();
+  // Inside the KingsChat webview, uploads must come from Gallery/Files only —
+  // direct camera capture is a host-side capability KingsChat has not granted.
+  const inKcWebView = useIsKingsChatWebView();
 
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [thumbFile, setThumbFile] = useState<File | null>(null);
@@ -25,6 +30,10 @@ export default function UploadPage() {
   const [channelId, setChannelId] = useState("");
   const [privacy, setPrivacy] = useState<"public" | "private">("public");
   const [isShort, setIsShort] = useState(false);
+  const [contentRating, setContentRating] = useState<"general" | "16+">(
+    "general",
+  );
+  const [declared, setDeclared] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -77,6 +86,19 @@ export default function UploadPage() {
     if (!videoFile) return setError("Please choose a video file.");
     if (!name.trim()) return setError("Please enter a title.");
     if (!channelId) return setError("Please select a channel to upload to.");
+    if (!declared)
+      return setError(
+        "Please confirm your video follows the Content Rules and is suitable for viewers aged 16+.",
+      );
+
+    // First-line objectionable-content screen on title/description/tags.
+    // Backend moderation + the report queue remain authoritative.
+    const screened = moderateFields({
+      title: name,
+      description,
+      tags,
+    });
+    if (!screened.ok) return setError(screened.message);
 
     const form = new FormData();
     form.append("video_title", name.trim());
@@ -88,6 +110,10 @@ export default function UploadPage() {
     form.append("channel", channelId);
     form.append("type", "video");
     form.append("is_short", isShort ? "yes" : "no");
+    // Uploader-declared audience rating. KingsChat's App Store rating is 16+,
+    // so nothing above "16+" can be declared or published.
+    form.append("content_rating", contentRating);
+    form.append("age_declaration", "16plus_confirmed");
     if (thumbFile) form.append("thumbnail", thumbFile, thumbFile.name);
     form.append("file", videoFile, videoFile.name);
 
@@ -165,10 +191,16 @@ export default function UploadPage() {
             <span className="flex flex-col items-center gap-2 text-subtext">
               <UploadIcon size={30} />
               <span className="text-sm font-semibold">
-                Tap to choose a video
+                {inKcWebView
+                  ? "Choose a video from Gallery or Files"
+                  : "Tap to choose a video"}
               </span>
             </span>
           )}
+          {/* No `capture` attribute and no getUserMedia anywhere in this app:
+              uploads come from Gallery/Files pickers only. Direct camera
+              capture is intentionally not requested — inside the KingsChat
+              webview it requires host-side consent that is not granted. */}
           <input
             ref={videoRef}
             type="file"
@@ -180,6 +212,12 @@ export default function UploadPage() {
             }}
           />
         </button>
+        {inKcWebView && !videoFile && (
+          <p className="-mt-2 text-xs text-subtext">
+            Camera capture isn&apos;t available inside KingsChat — pick an
+            existing video from your Gallery or Files.
+          </p>
+        )}
         {videoFile && (
           <p className="-mt-2 truncate text-xs text-subtext">
             {videoFile.name}
@@ -347,6 +385,59 @@ export default function UploadPage() {
             ))}
           </div>
         </div>
+
+        {/* Audience / content rating — KingsChat's App Store rating is 16+,
+            so this is the highest rating that can be published. */}
+        <div>
+          <label className="mb-1.5 block text-sm font-semibold">
+            Audience rating
+          </label>
+          <div className="flex gap-2">
+            {(
+              [
+                { v: "general", label: "General audience" },
+                { v: "16+", label: "16+ themes" },
+              ] as const
+            ).map((o) => (
+              <button
+                type="button"
+                key={o.v}
+                onClick={() => setContentRating(o.v)}
+                className="flex-1 rounded-xl border px-4 py-2 text-sm font-semibold"
+                style={{
+                  borderColor:
+                    contentRating === o.v ? "var(--primary)" : "var(--border)",
+                  color:
+                    contentRating === o.v ? "var(--primary)" : "var(--subtext)",
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs text-subtext">
+            Content rated above 16+ (adult, graphic or explicit material) is
+            not allowed on KingsSpace.
+          </p>
+        </div>
+
+        <label className="flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3">
+          <input
+            type="checkbox"
+            checked={declared}
+            onChange={(e) => setDeclared(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]"
+          />
+          <span className="text-xs text-subtext">
+            I confirm this video, its thumbnail, title, description and tags
+            follow the{" "}
+            <Link href="/legal/terms" className="font-semibold text-primary">
+              Content Rules
+            </Link>{" "}
+            and are suitable for viewers aged 16 and over. Content that breaks
+            these rules will be removed and may lead to account termination.
+          </span>
+        </label>
 
         {error && <p className="text-sm text-error">{error}</p>}
 
