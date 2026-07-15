@@ -35,11 +35,13 @@ export function videoThumb(item: VideoItem): string {
 
 // The `d3c5pcohbexzc4.cloudfront.net` CDN is dead; the same assets are served
 // from cdnvideos.ceflix.org. Rewrite the host so avatars/thumbnails resolve.
+// Also upgrade http:// → https:// — many profile/thumbnail URLs come back as
+// http (e.g. S3 avatars), which browsers block as mixed content when the app
+// is served over https, so they silently fail to load.
 export function fixCdn(url: unknown): string {
-  return String(url ?? "").replace(
-    "d3c5pcohbexzc4.cloudfront.net",
-    "cdnvideos.ceflix.org",
-  );
+  return String(url ?? "")
+    .replace("d3c5pcohbexzc4.cloudfront.net", "cdnvideos.ceflix.org")
+    .replace(/^http:\/\//i, "https://");
 }
 
 // Resolve a subscription channel object's avatar: explicit url, else prefix+file.

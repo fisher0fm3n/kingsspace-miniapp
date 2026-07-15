@@ -167,7 +167,7 @@ export default function ProfilePage() {
                   <Img
                     src={videoThumb(v)}
                     alt=""
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                 </div>
                 <div className="min-w-0 flex-1">

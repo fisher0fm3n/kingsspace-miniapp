@@ -21,7 +21,7 @@ export default function ChannelPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const { token, isLoggedIn } = useAuth();
+  const { token, isLoggedIn, user } = useAuth();
   const { data, isLoading, error } = useQuery({
     queryKey: ["channel", id, token],
     queryFn: () => getChannel(id, token || null),
@@ -49,6 +49,14 @@ export default function ChannelPage({
       data?.name ||
       "Channel",
   );
+
+  // You can't subscribe to, block, or report your own channel. The backend
+  // flags the owner via `canModifyVideos`; fall back to an id comparison.
+  const isOwnChannel =
+    isLoggedIn &&
+    (data?.canModifyVideos === true ||
+      (ch.userID != null &&
+        String(user?.userID ?? user?.id ?? "") === String(ch.userID)));
 
   const onToggleBlock = () => {
     if (blocked) {
@@ -133,43 +141,47 @@ export default function ChannelPage({
           </div>
           <p className="text-xs text-subtext">
             {[
-              subscribers != null
-                ? `${formatViews(subscribers).replace(" views", "")} subscribers`
-                : null,
+              `${formatViews(subscribers ?? 0).replace(" views", "")} subscribers`,
               videos.length ? `${videos.length} videos` : null,
             ]
               .filter(Boolean)
               .join(" · ")}
           </p>
         </div>
-        <button
-          onClick={onSubscribe}
-          className="rounded-full px-4 py-2 text-sm font-bold"
-          style={{
-            background: subscribed ? "var(--card)" : "var(--primary)",
-            color: subscribed ? "var(--subtext)" : "#fff",
-          }}
-        >
-          {subscribed ? "Subscribed" : "Subscribe"}
-        </button>
-      </div>
-
-      <div className="flex gap-4 px-4 pt-2">
-        <button
-          onClick={onToggleBlock}
-          className="text-xs font-semibold text-subtext underline"
-        >
-          {blocked ? "Unblock channel" : "Block channel"}
-        </button>
-        {ch.userID != null && (
+        {!isOwnChannel && (
           <button
-            onClick={() => (isLoggedIn ? setReportOpen(true) : router.push("/login"))}
-            className="text-xs font-semibold text-subtext underline"
+            onClick={onSubscribe}
+            className="rounded-full px-4 py-2 text-sm font-bold"
+            style={{
+              background: subscribed ? "var(--card)" : "var(--primary)",
+              color: subscribed ? "var(--subtext)" : "#fff",
+            }}
           >
-            Report channel
+            {subscribed ? "Subscribed" : "Subscribe"}
           </button>
         )}
       </div>
+
+      {!isOwnChannel && (
+        <div className="flex gap-4 px-4 pt-2">
+          <button
+            onClick={onToggleBlock}
+            className="text-xs font-semibold text-subtext underline"
+          >
+            {blocked ? "Unblock channel" : "Block channel"}
+          </button>
+          {ch.userID != null && (
+            <button
+              onClick={() =>
+                isLoggedIn ? setReportOpen(true) : router.push("/login")
+              }
+              className="text-xs font-semibold text-subtext underline"
+            >
+              Report channel
+            </button>
+          )}
+        </div>
+      )}
 
       {blocked && (
         <p className="px-4 py-6 text-center text-sm text-subtext">
@@ -191,7 +203,7 @@ export default function ChannelPage({
               <Img
                 src={videoThumb(v)}
                 alt=""
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
               />
             </div>
             <p className="mt-2 line-clamp-2 text-sm font-medium">

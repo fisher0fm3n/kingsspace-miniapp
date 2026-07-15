@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -22,6 +22,7 @@ import { moderateText } from "@/lib/moderation";
 import {
   channelThumb,
   clean,
+  fixCdn,
   formatViews,
   timeAgo,
   videoThumb,
@@ -43,6 +44,7 @@ import {
 import { PlaylistModal, ReportModal } from "@/components/watch/WatchModals";
 
 const AUTOPLAY_KEY = "kingsspace.watch.autoplay";
+const DEFAULT_AVATAR = "https://ceflix.org/images/avatar.png";
 
 export default function WatchPage({
   params,
@@ -133,6 +135,22 @@ export default function WatchPage({
   const src = useMemo(() => (video ? videoUrl(video) : ""), [video]);
   const channelId = video?.channel_id;
 
+  // Autoplay on load. Browsers block autoplay of videos with sound until the
+  // user interacts, so try to play with sound first and fall back to muted
+  // autoplay (the user can unmute via the controls) so it always starts.
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !src) return;
+    el.play().catch(() => {
+      el.muted = true;
+      el.play().catch(() => {});
+    });
+  }, [src]);
+
+  // The channel owner id of a comment (to hide self-report on own comments).
+  const currentUserId = String(user?.userID ?? user?.id ?? "").trim();
+
   const onEnded = () => {
     if (!autoplay) return;
     const next = upNext[0];
@@ -217,6 +235,7 @@ export default function WatchPage({
       <div className="sticky top-0 z-20 aspect-video w-full bg-black">
         {src ? (
           <video
+            ref={videoRef}
             src={src}
             poster={clean(video.thumbnail)}
             controls
@@ -378,43 +397,54 @@ export default function WatchPage({
           </button>
         </form>
         <div className="space-y-4">
-          {comments.map((c: any, i: number) => (
-            <div key={i} className="flex gap-3">
-              <Img
-                src={c.profile_pic || c.image || channelThumb(video)}
-                className="h-8 w-8 shrink-0 rounded-full bg-card object-cover"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-subtext">
-                  {clean(c.name || c.username || c.fname || "User")}{" "}
-                  <span className="font-normal">
-                    {timeAgo(c.datetime || c.created_at)}
-                  </span>
-                </p>
-                <p className="text-sm">{clean(c.comment || c.body)}</p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5 self-start">
-                <button
-                  onClick={() => onBlockCommenter(c)}
-                  className="text-xs font-semibold text-subtext"
-                  aria-label={`Block ${commentAuthorName(c)}`}
-                >
-                  Block
-                </button>
-                {c.id != null && (
-                  <button
-                    onClick={() =>
-                      requireLogin() && setCommentReportId(c.id)
-                    }
-                    className="text-xs font-semibold text-subtext"
-                    aria-label="Report comment"
-                  >
-                    Report
-                  </button>
+          {comments.map((c: any, i: number) => {
+            const isOwnComment =
+              currentUserId !== "" && commentAuthorId(c) === currentUserId;
+            return (
+              <div key={i} className="flex gap-3">
+                <Img
+                  src={
+                    fixCdn(c.profile_pic || c.image) ||
+                    channelThumb(video) ||
+                    DEFAULT_AVATAR
+                  }
+                  className="h-8 w-8 shrink-0 rounded-full bg-card object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-subtext">
+                    {clean(c.name || c.username || c.fname || "User")}{" "}
+                    <span className="font-normal">
+                      {timeAgo(c.datetime || c.created_at)}
+                    </span>
+                  </p>
+                  <p className="text-sm">{clean(c.comment || c.body)}</p>
+                </div>
+                {/* You can't block or report your own comment. */}
+                {!isOwnComment && (
+                  <div className="flex shrink-0 flex-col items-end gap-1.5 self-start">
+                    <button
+                      onClick={() => onBlockCommenter(c)}
+                      className="text-xs font-semibold text-subtext"
+                      aria-label={`Block ${commentAuthorName(c)}`}
+                    >
+                      Block
+                    </button>
+                    {c.id != null && (
+                      <button
+                        onClick={() =>
+                          requireLogin() && setCommentReportId(c.id)
+                        }
+                        className="text-xs font-semibold text-subtext"
+                        aria-label="Report comment"
+                      >
+                        Report
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
           {comments.length === 0 && (
             <p className="text-sm text-subtext">No comments yet.</p>
           )}
@@ -433,7 +463,7 @@ export default function WatchPage({
                 className="flex gap-3"
               >
                 <div className="aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-card">
-                  <Img src={videoThumb(item)} className="h-full w-full object-cover" />
+                  <Img src={videoThumb(item)} className="h-full w-full object-contain" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-sm font-medium">

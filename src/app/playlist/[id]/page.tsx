@@ -53,7 +53,7 @@ export default function PlaylistPage({
           <Img
             src={data.thumbnail || videoThumb(videos[0] || {})}
             alt=""
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
           />
           <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/80 to-transparent p-3">
             <div>
@@ -79,7 +79,7 @@ export default function PlaylistPage({
               <Img
                 src={videoThumb(v)}
                 alt=""
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
               />
               <span className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
                 <PlayIcon size={20} />

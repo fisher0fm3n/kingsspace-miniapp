@@ -107,7 +107,7 @@ export default function KingsBotPage() {
                       <Img
                         src={videoThumb(v)}
                         alt=""
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain"
                       />
                     </div>
                     <p className="mt-1 line-clamp-2 text-xs font-medium">

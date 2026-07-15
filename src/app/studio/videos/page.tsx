@@ -77,7 +77,7 @@ export default function StudioVideos() {
                 <Img
                   src={fixCdn(v.thumbnail)}
                   alt={clean(v.videos_title)}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
               </Link>
               <div className="flex min-w-0 flex-1 flex-col">
