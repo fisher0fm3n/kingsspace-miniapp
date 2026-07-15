@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Spinner } from "@/components/Skeletons";
 import { VerifiedIcon } from "@/components/Icons";
 import { Img } from "@/components/Img";
+import { ReportModal } from "@/components/watch/WatchModals";
 
 export default function ChannelPage({
   params,
@@ -31,6 +32,8 @@ export default function ChannelPage({
 
   const [blocked, setBlocked] = useState(false);
   useEffect(() => setBlocked(isBlocked("channel", id)), [id]);
+
+  const [reportOpen, setReportOpen] = useState(false);
 
   // The channel detail response nests the channel model under `data.channel`
   // (the display name is data.channel.channel). Reading data.channel directly
@@ -151,13 +154,21 @@ export default function ChannelPage({
         </button>
       </div>
 
-      <div className="px-4 pt-2">
+      <div className="flex gap-4 px-4 pt-2">
         <button
           onClick={onToggleBlock}
           className="text-xs font-semibold text-subtext underline"
         >
           {blocked ? "Unblock channel" : "Block channel"}
         </button>
+        {ch.userID != null && (
+          <button
+            onClick={() => (isLoggedIn ? setReportOpen(true) : router.push("/login"))}
+            className="text-xs font-semibold text-subtext underline"
+          >
+            Report channel
+          </button>
+        )}
       </div>
 
       {blocked && (
@@ -197,6 +208,15 @@ export default function ChannelPage({
           <p className="text-center text-sm text-subtext">No videos yet.</p>
         )}
       </div>
+      )}
+
+      {reportOpen && (
+        <ReportModal
+          kind="user"
+          targetId={ch.userID}
+          token={token}
+          onClose={() => setReportOpen(false)}
+        />
       )}
     </div>
   );

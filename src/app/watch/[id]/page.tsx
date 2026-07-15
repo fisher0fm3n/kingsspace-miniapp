@@ -107,6 +107,9 @@ export default function WatchPage({
   const [posting, setPosting] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [commentReportId, setCommentReportId] = useState<
+    string | number | null
+  >(null);
   const [autoplay, setAutoplay] = useState(true);
 
   useEffect(() => {
@@ -390,13 +393,26 @@ export default function WatchPage({
                 </p>
                 <p className="text-sm">{clean(c.comment || c.body)}</p>
               </div>
-              <button
-                onClick={() => onBlockCommenter(c)}
-                className="shrink-0 self-start text-xs font-semibold text-subtext"
-                aria-label={`Block ${commentAuthorName(c)}`}
-              >
-                Block
-              </button>
+              <div className="flex shrink-0 flex-col items-end gap-1.5 self-start">
+                <button
+                  onClick={() => onBlockCommenter(c)}
+                  className="text-xs font-semibold text-subtext"
+                  aria-label={`Block ${commentAuthorName(c)}`}
+                >
+                  Block
+                </button>
+                {c.id != null && (
+                  <button
+                    onClick={() =>
+                      requireLogin() && setCommentReportId(c.id)
+                    }
+                    className="text-xs font-semibold text-subtext"
+                    aria-label="Report comment"
+                  >
+                    Report
+                  </button>
+                )}
+              </div>
             </div>
           ))}
           {comments.length === 0 && (
@@ -442,9 +458,18 @@ export default function WatchPage({
       )}
       {reportOpen && (
         <ReportModal
-          videoId={id}
+          kind="video"
+          targetId={id}
           token={token}
           onClose={() => setReportOpen(false)}
+        />
+      )}
+      {commentReportId != null && (
+        <ReportModal
+          kind="comment"
+          targetId={commentReportId}
+          token={token}
+          onClose={() => setCommentReportId(null)}
         />
       )}
     </div>

@@ -222,6 +222,30 @@ export const reportVideo = (
     token,
   });
 
+export const reportComment = (
+  commentId: string | number,
+  flag: string | number,
+  message: string,
+  token: string,
+) =>
+  ceflix("video/comment/report", {
+    method: "POST",
+    body: { comment: commentId, flag, message, token },
+    token,
+  });
+
+export const reportUser = (
+  userId: string | number,
+  flag: string | number,
+  message: string,
+  token: string,
+) =>
+  ceflix("user/report", {
+    method: "POST",
+    body: { user: userId, flag, message, token },
+    token,
+  });
+
 export const getUserPlaylists = (videoId: string | number, token: string) =>
   ceflix("user/playlists", { method: "POST", body: { token }, token }).then(
     (j) => {

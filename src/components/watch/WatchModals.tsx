@@ -6,6 +6,8 @@ import {
   getReportFlags,
   getUserPlaylists,
   insertToPlaylist,
+  reportComment,
+  reportUser,
   reportVideo,
 } from "@/lib/api";
 import { clean } from "@/lib/utils";
@@ -187,14 +189,20 @@ export function PlaylistModal({
 }
 
 export function ReportModal({
+  kind = "video",
+  targetId,
   videoId,
   token,
   onClose,
 }: {
-  videoId: string | number;
+  kind?: "video" | "comment" | "user";
+  targetId?: string | number;
+  /** @deprecated pass targetId; kept for existing video callers */
+  videoId?: string | number;
   token: string;
   onClose: () => void;
 }) {
+  const id = targetId ?? videoId ?? "";
   const [flags, setFlags] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<number | null>(null);
@@ -212,7 +220,9 @@ export function ReportModal({
     if (!selected) return;
     setSubmitting(true);
     try {
-      await reportVideo(videoId, selected, message, token);
+      if (kind === "comment") await reportComment(id, selected, message, token);
+      else if (kind === "user") await reportUser(id, selected, message, token);
+      else await reportVideo(id, selected, message, token);
       setDone(true);
       setTimeout(onClose, 1500);
     } finally {
@@ -221,10 +231,16 @@ export function ReportModal({
   };
 
   return (
-    <Sheet title="Report video" onClose={onClose}>
+    <Sheet title={`Report ${kind}`} onClose={onClose}>
       {done ? (
         <p className="py-8 text-center text-sm text-subtext">
-          Report submitted. Thank you — we will review this video.
+          Report submitted. Thank you — our moderation team will review this
+          {kind === "comment"
+            ? " comment"
+            : kind === "user"
+              ? " user"
+              : " video"}
+          .
         </p>
       ) : loading ? (
         <div className="flex justify-center py-8">
