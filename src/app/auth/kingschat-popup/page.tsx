@@ -17,7 +17,7 @@ export default function KingsChatPopupPage() {
       return;
     }
 
-    window.location.href = "https://accounts.kingschat.online/log-in?clientId=f610b805-61ac-4a5f-811c-12e64c637a64";
+    window.location.href = "https://accounts.kingschat.online/log-in?clientId=15c51472-34fc-4d36-ba2c-907702b19bbf";
   }, [router]);
 
   return (

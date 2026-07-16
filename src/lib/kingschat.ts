@@ -10,7 +10,7 @@
 
 // KingsSpace's developer client ID — the same one /api/kingschat/token uses to
 // exchange the authCode. clientId is public (it only identifies the app).
-export const KINGSCHAT_CLIENT_ID = "f610b805-61ac-4a5f-811c-12e64c637a64";
+export const KINGSCHAT_CLIENT_ID = "15c51472-34fc-4d36-ba2c-907702b19bbf";
 export const KINGSCHAT_AUTH_ENDPOINT =
   "https://accounts.kingschat.online/log-in";
 
