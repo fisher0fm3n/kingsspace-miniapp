@@ -8,6 +8,7 @@ import { getChannel, subscribeChannel } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { block, isBlocked, unblock } from "@/lib/blocklist";
 import { clean, formatViews, timeAgo, videoThumb, videoTitle } from "@/lib/utils";
+import { publicViewCountLabel } from "@/lib/views";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { Spinner } from "@/components/Skeletons";
@@ -211,7 +212,12 @@ export default function ChannelPage({
               {videoTitle(v)}
             </p>
             <p className="mt-0.5 text-xs text-subtext">
-              {[formatViews(v.numOfViews || v.views), timeAgo(v.uploadtime)]
+              {[
+                // Withheld below 1K - see lib/views. Subscriber counts above
+                // are not video views and keep their full number.
+                publicViewCountLabel(v.numOfViews ?? v.views),
+                timeAgo(v.uploadtime),
+              ]
                 .filter(Boolean)
                 .join(" · ")}
             </p>

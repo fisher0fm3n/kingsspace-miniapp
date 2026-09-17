@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -15,13 +15,12 @@ import {
   channelAvatar,
   clean,
   fixCdn,
-  formatViews,
   isShort,
   timeAgo,
 } from "@/lib/utils";
+import { publicViewCountLabel } from "@/lib/views";
 import { Spinner } from "@/components/Skeletons";
 import { DiscoverEmpty } from "@/components/DiscoverEmpty";
-import { CollectionsBrowser } from "@/components/CollectionsBrowser";
 import { ClipsReel } from "@/components/ClipsReel";
 import { SearchIcon, UsersIcon } from "@/components/Icons";
 import { Img } from "@/components/Img";
@@ -42,7 +41,8 @@ function isToday(value?: string | number | null): boolean {
   );
 }
 
-const TABS = ["Following", "Search", "Collections", "Clips"] as const;
+// Collections is not here: it has its own tab in the bottom bar, as in the app.
+const TABS = ["Following", "Search", "Clips"] as const;
 type Tab = (typeof TABS)[number];
 
 function ChannelBubble({ channel }: { channel: any }) {
@@ -70,7 +70,8 @@ function FeedVideoCard({ item }: { item: any }) {
     : `/watch/${item.id}`;
   const meta = [
     clean(item.channel),
-    formatViews(item.numOfViews),
+    // Withheld below 1K - see lib/views.
+    publicViewCountLabel(item.numOfViews),
     timeAgo(item.uploadtime),
   ]
     .filter(Boolean)
@@ -272,7 +273,14 @@ function SearchResultRow({ result }: { result: SearchResult }) {
     );
   }
 
-  const channelName = data.channel?.name || data.channelName || "CeFlix";
+  const channelName = data.channel?.name || data.channelName || "KingsSpace";
+  const meta = [
+    clean(channelName),
+    publicViewCountLabel(data.views),
+    timeAgo(data.uploadtimeTs ?? data.uploadtime),
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <Link href={`/watch/${data.videoId}`} className="flex gap-3">
       <div className="aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-card">
@@ -284,9 +292,7 @@ function SearchResultRow({ result }: { result: SearchResult }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="line-clamp-2 text-sm font-medium">{clean(data.title)}</p>
-        <p className="mt-1 truncate text-xs text-subtext">
-          {clean(channelName)}
-        </p>
+        <p className="mt-1 line-clamp-2 text-xs text-subtext">{meta}</p>
       </div>
     </Link>
   );
@@ -376,22 +382,26 @@ function TabBar({
 
 function BrowseInner() {
   const params = useSearchParams();
+  const router = useRouter();
   const { isLoggedIn } = useAuth();
   const clipId = params.get("id");
   const initial = (params.get("tab") || "").toLowerCase();
+
+  // Old links to the Collections tab go to its own page.
+  useEffect(() => {
+    if (initial === "collections") router.replace("/collections");
+  }, [initial, router]);
   const initialTab: Tab = clipId
     ? "Clips"
     : initial === "search"
       ? "Search"
       : initial === "clips"
         ? "Clips"
-        : initial === "collections"
-          ? "Collections"
-          : initial === "following"
+        : initial === "following"
+          ? "Following"
+          : isLoggedIn
             ? "Following"
-            : isLoggedIn
-              ? "Following"
-              : "Search";
+            : "Search";
   const [tab, setTab] = useState<Tab>(initialTab);
 
   // Clips is a full-screen reel with the tabs overlaid transparently on top,
@@ -418,7 +428,6 @@ function BrowseInner() {
 
       {tab === "Following" && <FollowingTab />}
       {tab === "Search" && <SearchTab />}
-      {tab === "Collections" && <CollectionsBrowser />}
     </div>
   );
 }

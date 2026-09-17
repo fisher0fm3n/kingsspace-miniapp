@@ -143,6 +143,12 @@ export default function StudioDashboard() {
               subtitle="Add a new video or clip"
               icon={<UploadIcon size={22} />}
             />
+            <ActionRow
+              href="/studio/earnings"
+              title="Ad Earnings"
+              subtitle="What ads on your videos earned, and withdrawals"
+              icon={<EyeIcon size={22} />}
+            />
           </div>
         </div>
       )}

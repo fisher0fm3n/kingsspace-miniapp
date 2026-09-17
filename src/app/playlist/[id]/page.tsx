@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { getPlaylist } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { clean, formatViews, videoThumb, videoTitle } from "@/lib/utils";
+import { clean, timeAgo, videoThumb, videoTitle } from "@/lib/utils";
+import { publicViewCountLabel } from "@/lib/views";
 import { PageHeader } from "@/components/PageHeader";
 import { Spinner } from "@/components/Skeletons";
 import { PlayIcon } from "@/components/Icons";
@@ -88,7 +89,12 @@ export default function PlaylistPage({
             <div className="min-w-0 flex-1">
               <p className="line-clamp-2 text-sm font-medium">{videoTitle(v)}</p>
               <p className="mt-0.5 truncate text-xs text-subtext">
-                {[clean(v.channel), formatViews(v.numOfViews || v.views)]
+                {[
+                  clean(v.channel),
+                  // Withheld below 1K - see lib/views.
+                  publicViewCountLabel(v.numOfViews ?? v.views),
+                  timeAgo(v.uploadtime),
+                ]
                   .filter(Boolean)
                   .join(" · ")}
               </p>

@@ -25,7 +25,14 @@ export const QUERY_CACHE_STORAGE_KEY = "kingsspace.query-cache.v1";
 
 const CACHE_KEY = QUERY_CACHE_STORAGE_KEY;
 const CACHE_TTL = 1000 * 60 * 60 * 6; // 6h
-const PERSIST_PREFIXES = ["home", "news", "collections", "collection", "clips"];
+const PERSIST_PREFIXES = [
+  "home",
+  "news",
+  "collections",
+  "collection-playlists",
+  "clips",
+  "live-stations",
+];
 
 function isPublicQueryKey(key: readonly unknown[]): boolean {
   return typeof key[0] === "string" && PERSIST_PREFIXES.includes(key[0]);

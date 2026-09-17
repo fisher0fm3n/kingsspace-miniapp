@@ -11,6 +11,7 @@ import {
   videoThumb,
   videoTitle,
 } from "@/lib/utils";
+import { publicViewCountLabel } from "@/lib/views";
 import { Img as Thumb } from "./Img";
 
 export function videoHref(item: VideoItem): string {
@@ -64,6 +65,68 @@ export function VideoCard({
           <p className="mt-1 truncate text-xs text-subtext">
             {clean(item.channel)}
           </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * Two-across grid card for the home sections, YouTube style: thumbnail, then
+ * channel avatar beside the title and a "channel · views · age" line. Views
+ * are withheld below 1K (see lib/views).
+ */
+export function VideoGridCard({ item }: { item: VideoItem }) {
+  const router = useRouter();
+  const channelId = item.channelId || item.channel_id;
+  const meta = [
+    clean(item.channel),
+    publicViewCountLabel(item.views ?? item.numOfViews),
+    timeAgo(item.uploadtime),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <Link href={videoHref(item)} className="block min-w-0">
+      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-card">
+        <Thumb
+          src={videoThumb(item)}
+          alt={videoTitle(item)}
+          className="h-full w-full object-cover"
+        />
+        {Number(item.isLive) === 1 && (
+          <span className="absolute bottom-1.5 left-1.5 rounded bg-error px-1.5 py-0.5 text-[10px] font-bold text-white">
+            LIVE
+          </span>
+        )}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (channelId) router.push(`/channel/${channelId}`);
+          }}
+          className="shrink-0"
+          aria-label={clean(item.channel) || "Channel"}
+        >
+          <Thumb
+            src={channelThumb(item)}
+            alt=""
+            className="h-7 w-7 rounded-full bg-card object-cover"
+          />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-[13px] font-medium leading-[18px]">
+            {videoTitle(item)}
+          </p>
+          {meta && (
+            <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-subtext">
+              {meta}
+            </p>
+          )}
         </div>
       </div>
     </Link>

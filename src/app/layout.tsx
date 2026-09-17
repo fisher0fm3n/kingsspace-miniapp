@@ -11,9 +11,30 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600", "700", "800"],
 });
 
+const title = "KingsSpace";
+const description = "KingsSpace — watch, browse and share inspiring content.";
+
+// Link previews use the same KingsSpace cover as the website. The absolute
+// URLs need the public origin, which is only known per deployment.
+const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
 export const metadata: Metadata = {
-  title: "KingsSpace",
-  description: "KingsSpace — watch, browse and share inspiring content.",
+  ...(appUrl ? { metadataBase: new URL(appUrl) } : {}),
+  title,
+  description,
+  openGraph: {
+    title,
+    description,
+    siteName: "KingsSpace",
+    type: "website",
+    images: [{ url: "/og-image.jpg", width: 1600, height: 900, alt: "KingsSpace" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+    images: ["/og-image.jpg"],
+  },
 };
 
 export const viewport: Viewport = {

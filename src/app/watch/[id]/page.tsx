@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -30,12 +30,12 @@ import {
   channelThumb,
   clean,
   fixCdn,
-  formatViews,
   timeAgo,
   videoThumb,
   videoTitle,
   videoUrl,
 } from "@/lib/utils";
+import { publicViewCountLabel, viewCountText } from "@/lib/views";
 import { PageHeader } from "@/components/PageHeader";
 import { Box } from "@/components/Skeletons";
 import { Img } from "@/components/Img";
@@ -47,6 +47,7 @@ import {
   FlagIcon,
   AutoplayIcon,
   BackIcon,
+  EyeIcon,
   SettingsIcon,
 } from "@/components/Icons";
 import {
@@ -56,6 +57,8 @@ import {
 } from "@/components/watch/WatchModals";
 
 const AUTOPLAY_KEY = "kingsspace.watch.autoplay";
+/** How long the overlay buttons stay up after a tap or once playback starts. */
+const CONTROLS_HIDE_MS = 3500;
 const DEFAULT_AVATAR = "https://ceflix.org/images/avatar.png";
 
 export default function WatchPage({
@@ -129,6 +132,58 @@ export default function WatchPage({
     null,
   );
   const [qualityOpen, setQualityOpen] = useState(false);
+  /** Reveals a sub-1K view count after the viewer taps the eye icon. */
+  const [showLowViewCount, setShowLowViewCount] = useState(false);
+
+  /*
+   * The overlay buttons (back, autoplay, quality) show and hide the way the
+   * native controls do: a tap on the player brings them up, and a few seconds
+   * into playback they fade out again. A paused video keeps them on screen.
+   */
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const playingRef = useRef(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleHide = useCallback(() => {
+    clearHideTimer();
+    hideTimerRef.current = setTimeout(() => {
+      if (playingRef.current) setControlsVisible(false);
+    }, CONTROLS_HIDE_MS);
+  }, [clearHideTimer]);
+
+  const revealControls = useCallback(() => {
+    setControlsVisible(true);
+    scheduleHide();
+  }, [scheduleHide]);
+
+  const onPlayerTap = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Taps on the overlay buttons are theirs, not a toggle.
+    if ((e.target as HTMLElement).closest("button")) {
+      scheduleHide();
+      return;
+    }
+    if (controlsVisible && playingRef.current) {
+      clearHideTimer();
+      setControlsVisible(false);
+    } else {
+      revealControls();
+    }
+  };
+
+  useEffect(() => clearHideTimer, [clearHideTimer]);
+
+  // A new video starts with the overlay up and its low count hidden again.
+  useEffect(() => {
+    setShowLowViewCount(false);
+    setControlsVisible(true);
+  }, [id]);
 
   useEffect(() => {
     setLiked(Boolean(data?.liked));
@@ -301,7 +356,12 @@ export default function WatchPage({
   return (
     <div className="pb-8">
       {/* Player */}
-      <div className="sticky top-0 z-20 aspect-video w-full bg-black">
+      <div
+        className="sticky top-0 z-20 aspect-video w-full bg-black"
+        // Taps on the native player still reach this wrapper, so a tap on the
+        // video toggles the overlay together with the native controls.
+        onPointerUp={onPlayerTap}
+      >
         {src ? (
           <video
             ref={videoRef}
@@ -310,7 +370,20 @@ export default function WatchPage({
             controls
             autoPlay
             playsInline
-            onEnded={onEnded}
+            onEnded={() => {
+              playingRef.current = false;
+              setControlsVisible(true);
+              onEnded();
+            }}
+            onPlay={() => {
+              playingRef.current = true;
+              scheduleHide();
+            }}
+            onPause={() => {
+              playingRef.current = false;
+              clearHideTimer();
+              setControlsVisible(true);
+            }}
             onLoadedMetadata={onLoadedMetadata}
             className="h-full w-full bg-black"
           />
@@ -324,13 +397,20 @@ export default function WatchPage({
         <button
           onClick={() => router.back()}
           aria-label="Back"
-          className="absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white"
+          tabIndex={controlsVisible ? 0 : -1}
+          className={`absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white transition-opacity duration-200 ${
+            controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
         >
           <BackIcon size={20} />
         </button>
 
         {/* Autoplay + quality overlays */}
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
+        <div
+          className={`absolute right-3 top-3 z-10 flex items-center gap-2 transition-opacity duration-200 ${
+            controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+        >
           <button
             onClick={toggleAutoplay}
             aria-label="Toggle autoplay"
@@ -358,11 +438,31 @@ export default function WatchPage({
       {/* Title + meta */}
       <div className="px-4 pt-3">
         <h1 className="text-base font-bold leading-6">{videoTitle(video)}</h1>
-        <p className="mt-1 text-xs text-subtext">
-          {[formatViews(video.numOfViews), timeAgo(video.uploadtime)]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
+        <div className="mt-1 flex items-center gap-2">
+          <p className="text-xs text-subtext">
+            {[
+              // Withheld below 1K - see lib/views.
+              publicViewCountLabel(video.numOfViews) ??
+                (showLowViewCount ? viewCountText(video.numOfViews) : null),
+              timeAgo(video.uploadtime),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+
+          {/* Under 1K the count is hidden by default; this reveals it on
+              request rather than advertising a low number. */}
+          {!publicViewCountLabel(video.numOfViews) && !showLowViewCount && (
+            <button
+              type="button"
+              onClick={() => setShowLowViewCount(true)}
+              aria-label="Show view count"
+              className="p-0.5 text-subtext"
+            >
+              <EyeIcon size={15} />
+            </button>
+          )}
+        </div>
 
         {/* Action row */}
         <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">

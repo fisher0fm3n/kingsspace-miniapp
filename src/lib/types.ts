@@ -38,6 +38,8 @@ export type VideoItem = {
 
 export type HomeSection = {
   id: number;
+  /** Stable identifier, e.g. "continue-watching" or "clips". */
+  key?: string;
   slug: string;
   title: string;
   data: VideoItem[];

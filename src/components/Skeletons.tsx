@@ -20,41 +20,37 @@ export function Box({
 export function HomeSkeleton() {
   return (
     <div className="pt-3">
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center justify-between px-3 pb-3">
+        <Box w={36} h={36} radius={18} />
         <Box w={40} h={40} radius={20} />
-        <Box w={42} h={42} radius={21} />
       </div>
-      <div className="no-scrollbar flex gap-4 overflow-x-auto px-4">
-        {[0, 1].map((i) => (
-          <div key={i} className="shrink-0" style={{ width: 300 }}>
-            <Box w={300} h={168} />
-            <div className="mt-3 flex gap-3">
-              <Box w={44} h={44} radius={22} />
-              <div className="flex-1">
-                <Box w="70%" h={16} radius={999} />
-                <div className="mt-2">
-                  <Box w="50%" h={12} radius={999} />
-                </div>
-              </div>
+      {/* Live TV strip */}
+      <div className="px-3">
+        <Box w={90} h={20} radius={999} />
+      </div>
+      <div className="no-scrollbar mt-2.5 flex gap-3.5 overflow-hidden px-3">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex w-[68px] shrink-0 flex-col items-center">
+            <Box w={60} h={60} radius={30} />
+            <div className="mt-1.5">
+              <Box w={48} h={10} radius={999} />
             </div>
           </div>
         ))}
       </div>
       {[0, 1].map((s) => (
-        <div key={s} className="mt-6">
-          <div className="mb-3 px-4">
-            <Box w={170} h={22} radius={999} />
-          </div>
-          <div className="no-scrollbar flex gap-4 overflow-x-auto px-4">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="shrink-0" style={{ width: 260 }}>
-                <Box w={260} h={146} />
-                <div className="mt-3 flex gap-3">
-                  <Box w={36} h={36} radius={18} />
+        <div key={s} className="mt-7 px-3">
+          <Box w={170} h={20} radius={999} />
+          <div className="mt-2.5 grid grid-cols-2 gap-x-2.5 gap-y-[18px]">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i}>
+                <Box w="100%" h={96} />
+                <div className="mt-2 flex gap-2">
+                  <Box w={28} h={28} radius={14} />
                   <div className="flex-1">
-                    <Box w="90%" h={14} radius={999} />
-                    <div className="mt-2">
-                      <Box w="60%" h={12} radius={999} />
+                    <Box w="95%" h={12} radius={999} />
+                    <div className="mt-1.5">
+                      <Box w="60%" h={10} radius={999} />
                     </div>
                   </div>
                 </div>

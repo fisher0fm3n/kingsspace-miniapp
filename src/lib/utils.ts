@@ -86,26 +86,54 @@ export function formatViews(n: unknown): string {
   return `${v} view${v === 1 ? "" : "s"}`;
 }
 
-export function timeAgo(date?: string | number): string {
-  if (!date) return "";
-  const d = typeof date === "number" ? new Date(date * 1000) : new Date(date);
-  const t = d.getTime();
-  if (Number.isNaN(t)) return "";
-  const diff = Date.now() - t;
+/**
+ * Relative age: "Just now", "3 days ago", "2 months ago".
+ *
+ * Accepts the API's epoch seconds as a number or numeric string (milliseconds
+ * are tolerated), or a date string. Empty when unknown or in the future.
+ */
+export function timeAgo(date?: string | number | null): string {
+  if (date === undefined || date === null || date === "") return "";
+
+  let ms: number;
+  const numeric = typeof date === "number" ? date : /^\d+$/.test(String(date).trim()) ? Number(date) : NaN;
+  if (Number.isFinite(numeric)) {
+    if (numeric <= 0) return "";
+    ms = numeric > 1e12 ? numeric : numeric * 1000;
+  } else {
+    ms = new Date(String(date)).getTime();
+  }
+  if (Number.isNaN(ms)) return "";
+
+  const diff = Date.now() - ms;
+  if (diff < 0) return "";
+
   const min = Math.floor(diff / 60000);
   const hr = Math.floor(diff / 3600000);
   const day = Math.floor(diff / 86400000);
+  const week = Math.floor(day / 7);
+  const month = Math.floor(day / 30);
+  const year = Math.floor(day / 365);
+
   if (min < 1) return "Just now";
   if (min < 60) return `${min} min${min === 1 ? "" : "s"} ago`;
   if (hr < 24) return `${hr} hour${hr === 1 ? "" : "s"} ago`;
   if (day < 7) return `${day} day${day === 1 ? "" : "s"} ago`;
-  return d.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  if (week < 5) return `${week} week${week === 1 ? "" : "s"} ago`;
+  if (month < 12) return `${month} month${month === 1 ? "" : "s"} ago`;
+  return `${year} year${year === 1 ? "" : "s"} ago`;
 }
 
 export function isShort(item: VideoItem): boolean {
   return item?.isShort === "yes";
+}
+
+/**
+ * "1 video" / "24 videos". Returns null when the API did not send a count, so
+ * a tag is simply not shown against an older API rather than reading "0".
+ */
+export function formatVideoCount(count: unknown): string | null {
+  const n = Number(count);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `${n} video${n === 1 ? "" : "s"}`;
 }

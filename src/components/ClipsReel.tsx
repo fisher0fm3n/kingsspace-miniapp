@@ -6,6 +6,7 @@ import { getClips, likeVideo } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { ClipItem } from "@/lib/types";
 import { clean } from "@/lib/utils";
+import { loadViewedClipIds, rememberViewedClip } from "@/lib/clipHistory";
 import { Spinner } from "@/components/Skeletons";
 import { Img } from "@/components/Img";
 import { HeartIcon, CommentIcon, ShareIcon } from "@/components/Icons";
@@ -148,47 +149,95 @@ function ClipSlide({
  * feed (effectively a random reel); with one it starts from that clip.
  * Fills its parent — the parent controls the height (full screen or under tabs).
  */
+const CLIPS_LIMIT = 10;
+
 export function ClipsReel({ selectedId }: { selectedId?: string | null }) {
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
   const [active, setActive] = useState(0);
   const [commentsClipId, setCommentsClipId] = useState<string | number | null>(
     null,
   );
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Every id served this visit. Sent back as `exclude` so the API pages by
+  // what is already on screen instead of by offset - offset paging cannot work
+  // against a ranking that changes as the viewer watches.
+  const servedIdsRef = useRef<Set<string>>(new Set());
+  const fetchingRef = useRef(false);
+
   const load = useCallback(
     async (nextOffset: number, first: boolean) => {
-      const raw = await getClips(nextOffset, 10, first ? selectedId : null);
-      const items = raw.map(normalizeClip).filter(Boolean) as ClipItem[];
-      setClips((prev) => {
-        const seen = new Set(prev.map((c) => String(c.id)));
-        const merged = first
-          ? items
-          : [...prev, ...items.filter((c) => !seen.has(String(c.id)))];
-        return merged;
-      });
-      setOffset(nextOffset + 10);
-      setLoading(false);
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+
+      const request = async (withHistory: boolean) => {
+        const held = Array.from(servedIdsRef.current);
+        const history = withHistory
+          ? loadViewedClipIds().filter((id) => !servedIdsRef.current.has(id))
+          : [];
+        const raw = await getClips(
+          nextOffset,
+          CLIPS_LIMIT,
+          first ? selectedId : null,
+          [...held, ...history],
+        );
+        const items = raw.map(normalizeClip).filter(Boolean) as ClipItem[];
+        // Only clips not already on screen count as progress.
+        const fresh = items.filter((c) => !servedIdsRef.current.has(String(c.id)));
+        return { fresh, usedHistory: history.length > 0 };
+      };
+
+      try {
+        let { fresh, usedHistory } = await request(true);
+
+        // Everything unseen is used up. Rather than a dead end, let clips
+        // watched in earlier visits come round again - still never one that
+        // is on screen right now.
+        if (fresh.length === 0 && usedHistory) {
+          ({ fresh } = await request(false));
+        }
+
+        fresh.forEach((c) => servedIdsRef.current.add(String(c.id)));
+        setClips((prev) => (first ? fresh : [...prev, ...fresh]));
+        setOffset(nextOffset + CLIPS_LIMIT);
+        setHasMore(fresh.length > 0);
+      } catch {
+        if (first) setHasMore(false);
+      } finally {
+        fetchingRef.current = false;
+        setLoading(false);
+      }
     },
     [selectedId],
   );
 
   useEffect(() => {
+    // A fresh reel: drop the previous one straight away so its clip does not
+    // keep playing under the spinner.
+    servedIdsRef.current.clear();
     setClips([]);
     setActive(0);
+    setHasMore(true);
     setLoading(true);
     load(0, true);
   }, [load]);
+
+  // Remember what has been watched, so the next visit starts somewhere new.
+  useEffect(() => {
+    const clip = clips[active];
+    if (clip) rememberViewedClip(clip.id);
+  }, [active, clips]);
 
   const onScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
     const idx = Math.round(el.scrollTop / el.clientHeight);
     setActive(idx);
-    if (idx >= clips.length - 2) load(offset, false);
-  }, [clips.length, offset, load]);
+    if (hasMore && idx >= clips.length - 2) load(offset, false);
+  }, [clips.length, hasMore, offset, load]);
 
   if (loading)
     return (

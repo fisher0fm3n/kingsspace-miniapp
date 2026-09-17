@@ -89,3 +89,20 @@ a {
   border-radius: 9999px;
   animation: spin 0.7s linear infinite;
 }
+
+/* Language row in the home popup: a thin scrollbar that stays visible, so the
+   row reads as scrollable even before anyone drags it. */
+.popup-languages {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+.popup-languages::-webkit-scrollbar {
+  height: 6px;
+}
+.popup-languages::-webkit-scrollbar-track {
+  background: transparent;
+}
+.popup-languages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+}

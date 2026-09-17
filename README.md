@@ -9,15 +9,18 @@ the core experience as a mobile-first web app.
 
 | Area | Route | Notes |
 |------|-------|-------|
-| Home feed | `/` | `smarthome` sections, hero live-station previews, clips row, recommended, and news feed interleaved (mirrors the RN home). |
-| Browse | `/browse` | Tabs: **Collections · Following · Clips · Search** (`?tab=` deep-links). |
-| Collections | `/collections`, `/collections/[id]` | Grid + collection detail with playlist rows. |
+| Home feed | `/` | Live TV logo strip, `smarthome` sections as a two-column grid with "Show more", the server's Clips row, news posts interleaved, recommended at the end, and the admin-controlled home popup (mirrors the RN home). |
+| Live TV | `/livestations/[id]` | Station stream (HLS via hls.js where needed), details, and every other station to hop between. |
+| Browse | `/browse` | Tabs: **Following · Clips · Search** (`?tab=` deep-links; Collections has its own tab). |
+| Collections | `/collections`, `/collections/[id]` | Grid + collection detail that opens straight onto its playlists; search looks across every playlist in every collection. |
 | Clips (Shorts) | `/clips` | Full-screen vertical, snap-scroll, autoplay, infinite paging, like. `?id=` opens a specific clip. |
 | Watch | `/watch/[id]` | Video player, views/date, like, share, subscribe, description, comments (view + post), up-next. |
 | Channel | `/channel/[id]` | Cover, avatar, subscribe, video grid. |
 | Playlist | `/playlist/[id]` | Ordered playlist with play-through links. |
 | KingsBot AI | `/kingsbot` | Chat UI backed by the `kingsspace/search/ask` endpoint, renders suggested videos. |
-| Profile | `/profile` | History / Liked / Subscriptions tabs, settings & legal links, sign out. |
+| Profile | `/profile`, `/library/[section]` | Identity, creator shortcuts, ad earnings, shelves of your videos / playlists / likes / history with "View all" pages, settings & legal links, sign out. |
+| Onboarding | `/welcome`, `/interests` | First-visit welcome for signed-out visitors; interests picker for signed-in users with none saved (skippable per session; `?mode=edit` from the You tab). |
+| Ad earnings | `/studio/earnings` | Per-channel ad earnings and withdrawal to the channel's Espees wallet. |
 | Auth | `/login`, `/auth/callback` | Username/password login **and** KingsChat auth (launch `authCode` → server-side exchange; legacy web OAuth fallback). |
 | Upload | `/upload` | Auth-gated upload (Gallery/Files only inside the KingsChat webview), content-rating + 16+ declaration, text moderation screen. |
 | Legal | `/legal/terms`, `/legal/privacy` | Terms of Use (content rules, prohibited content, moderation/takedowns/bans/termination) and Privacy Policy (data, retention, deletion, consent). |

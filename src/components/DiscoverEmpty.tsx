@@ -6,7 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getDiscovery, subscribeChannel, type SuggestedChannel } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { VideoItem } from "@/lib/types";
-import { clean, fixCdn, formatViews } from "@/lib/utils";
+import { clean, fixCdn } from "@/lib/utils";
+import { publicViewCountLabel } from "@/lib/views";
 import { Img } from "@/components/Img";
 import { Spinner } from "@/components/Skeletons";
 import { CompassIcon } from "@/components/Icons";
@@ -209,7 +210,11 @@ export function DiscoverEmpty({
 
 function TrendingTile({ item, full }: { item: VideoItem; full: boolean }) {
   const id = item.videoId ?? item.id;
-  const meta = [clean(item.channel), formatViews(item.views ?? item.numOfViews)]
+  const meta = [
+    clean(item.channel),
+    // Withheld below 1K - see lib/views.
+    publicViewCountLabel(item.views ?? item.numOfViews),
+  ]
     .filter(Boolean)
     .join(" · ");
 

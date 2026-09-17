@@ -53,8 +53,31 @@ export const nmt = <T = any>(path: string, options?: ReqOptions) =>
 // Endpoint helpers
 // ---------------------------------------------------------------------------
 
-export const getHome = () =>
-  ceflix("smarthome", { method: "POST", body: {} }).then((j) => j);
+/**
+ * The personalised home feed. The token is what makes it personal; without it
+ * the API returns trending and fresh content. `layout_version: 2` tells the
+ * API this client renders sections in the order sent, so it delivers the
+ * Clips row itself (the app does the same).
+ */
+export const getHome = (token?: string | null) =>
+  ceflix("smarthome", {
+    method: "POST",
+    body: { token: token ?? getToken(), layout_version: 2 },
+  }).then((j) => j);
+
+/** Every live TV station, in the API's order. Stations without a stream are dropped. */
+export const getLiveStations = () =>
+  ceflix("livestations", { method: "POST", body: {} }).then((j) =>
+    (Array.isArray(j?.data) ? j.data : [])
+      .map((row: any) => ({
+        id: Number(row?.id ?? 0),
+        name: String(row?.name ?? ""),
+        desc: String(row?.desc ?? ""),
+        src: String(row?.src ?? ""),
+        imgChannel: String(row?.imgChannel ?? ""),
+      }))
+      .filter((row: { src: string }) => row.src),
+  );
 
 export const getNewsPosts = async () => {
   const json = await nmt("kingsspace/rss");
@@ -65,14 +88,57 @@ export const getNewsPosts = async () => {
 export const getCollections = () =>
   ceflix("collections").then((j) => (Array.isArray(j?.data) ? j.data : []));
 
-// A collection resolves to { collection, sections }; each section drills into
-// collections/section/{id}/items which returns { collection, section, items }
-// where each item wraps a playlist with its videos.
-export const getCollection = (id: string) =>
-  ceflix(`collections/${id}`).then((j) => ({
-    collection: j?.data?.collection ?? null,
-    sections: Array.isArray(j?.data?.sections) ? j.data.sections : [],
-  }));
+/**
+ * A collection is its playlists.
+ *
+ * There used to be a middle layer (Collection -> Sections -> Playlists). Now
+ * `collections/{id}/items` returns every playlist in the collection, each
+ * with its videos. `items` is the flat list; an older API only sends
+ * `sections`, each with its own items, and flattening those gives the same.
+ */
+export const getCollectionPlaylists = (id: string) =>
+  ceflix(`collections/${encodeURIComponent(id)}/items`).then((j) => {
+    const data = j?.data ?? {};
+    const items: any[] = Array.isArray(data.items)
+      ? data.items
+      : Array.isArray(data.sections)
+        ? data.sections.flatMap((section: any) =>
+            Array.isArray(section?.items) ? section.items : [],
+          )
+        : [];
+    return { collection: data.collection ?? null, items };
+  });
+
+/** One playlist found by the cross-collection search. */
+export type CollectionPlaylistResult = {
+  id: string;
+  playlist_id: string;
+  title: string;
+  thumbnail: string;
+  video_count: number;
+  collection: { id: string; title: string };
+  section: { id: string; title: string };
+};
+
+/** The API ignores queries shorter than this and returns nothing. */
+export const COLLECTION_SEARCH_MIN_LENGTH = 2;
+
+/**
+ * Searches the titles of every playlist in every collection, so a search box
+ * on any collections screen finds a playlist wherever it is filed.
+ */
+export const searchCollectionPlaylists = async (
+  term: string,
+  signal?: AbortSignal,
+): Promise<CollectionPlaylistResult[]> => {
+  const q = term.trim();
+  if (q.length < COLLECTION_SEARCH_MIN_LENGTH) return [];
+  const j = await ceflix(`collections/search?q=${encodeURIComponent(q)}`, {
+    token: null,
+    signal,
+  });
+  return Array.isArray(j?.data) ? j.data : [];
+};
 
 export const getCollectionSection = (id: string) =>
   ceflix(`collections/section/${id}/items`).then((j) => ({
@@ -119,9 +185,21 @@ export const getPlaylist = (id: string, token?: string | null) =>
     token,
   }).then((j) => j?.data ?? j);
 
-export const getClips = (offset = 0, limit = 10, videoID?: string | null) => {
+/**
+ * A page of clips. `exclude` holds ids already served or already watched, so
+ * the API builds the page from what the viewer has not seen. `offset` is sent
+ * alongside on purpose: a server without exclusion support falls back to
+ * offset paging rather than returning the same page forever.
+ */
+export const getClips = (
+  offset = 0,
+  limit = 10,
+  videoID?: string | null,
+  exclude: string[] = [],
+) => {
   const body: Record<string, unknown> = { offset, limit, token: getToken() };
   if (videoID) body.videoID = videoID;
+  if (exclude.length > 0) body.exclude = exclude;
   return ceflix("video/shorts/items", { method: "POST", body }).then((j) =>
     Array.isArray(j?.data) ? j.data : [],
   );
@@ -132,9 +210,35 @@ export type SearchResult =
   | { type: "channel"; data: any }
   | { type: "playlist"; data: any };
 
-// Mirrors the RN SearchScreen: external video results (NMT) combined with the
-// internal ceflix search (channels + playlists). The internal `data` is an
-// object, not an array — treating it as an array is what broke the old search.
+/**
+ * Video search.
+ *
+ * Moved off the external loveworldapis service onto the CeFlix API, which
+ * ranks with recency and does not OR-match on the weakest term (a typo in one
+ * word used to return every "service" on the platform). Same response shape.
+ * The old service stays as a fallback only for a missing route (404), for the
+ * window where this build is live but the API route is not; a 5xx or 403 on
+ * the new endpoint is a real problem and is not papered over.
+ */
+async function searchVideos(q: string) {
+  const query = `q=${encodeURIComponent(q)}&limit=50&sort=relevance`;
+
+  try {
+    const res = await fetch(`/api/ceflix/search/videos?${query}`);
+    if (res.status !== 404) return res.ok ? await res.json() : null;
+    console.warn(
+      "[search] /api/search/videos returned 404 - API not deployed or route cache stale. Falling back to legacy search.",
+    );
+  } catch (e) {
+    console.warn("[search] CeFlix search unreachable, falling back to legacy search.", e);
+  }
+
+  return nmt(`kingsspace/search/external/videos?${query}`).catch(() => null);
+}
+
+// Mirrors the app's SearchScreen: video results combined with the internal
+// ceflix search (channels + playlists). The internal `data` is an object, not
+// an array — treating it as an array is what broke the old search.
 export const searchAll = async (
   query: string,
   token?: string | null,
@@ -143,11 +247,7 @@ export const searchAll = async (
   if (!q) return [];
 
   const [videoRes, internalRes] = await Promise.all([
-    nmt(
-      `kingsspace/search/external/videos?q=${encodeURIComponent(
-        q,
-      )}&limit=50&sort=relevance`,
-    ).catch(() => null),
+    searchVideos(q),
     ceflix("search", {
       method: "POST",
       body: token ? { param: q, token } : { param: q },
@@ -519,6 +619,189 @@ export const getUserLiked = (token: string) =>
   ceflix("user/videos/liked", { method: "POST", body: { token }, token }).then(
     (j) => j?.data ?? [],
   );
+
+/** The signed-in user's own playlists (the Profile shelf and library page). */
+export const getMyPlaylists = (token: string) =>
+  ceflix("user/playlists", { method: "POST", body: { token }, token }).then(
+    (j) => (Array.isArray(j?.data) ? j.data : []),
+  );
+
+// --- Interests (personalisation) ------------------------------------------
+
+export type Interest = {
+  id: number;
+  title: string;
+  description: string;
+  thumbnail: string;
+  /** Accent used for the tile when no image renders. */
+  color?: string;
+  featured: boolean;
+  channel_count: number;
+};
+
+export type InterestStatus = {
+  selected: number[];
+  selected_count: number;
+  completed: boolean;
+  should_prompt: boolean;
+  recommended_minimum: number;
+};
+
+export const getInterestCatalog = () =>
+  ceflix("interests", { token: null }).then((j) => ({
+    interests: (Array.isArray(j?.data) ? j.data : []) as Interest[],
+    recommendedMinimum: Number(j?.meta?.recommended_minimum ?? 3),
+    maxSelections: Number(j?.meta?.max_selections ?? 25),
+  }));
+
+export const getInterestStatus = (token: string) =>
+  ceflix("interests/status", { method: "POST", body: { token }, token }).then(
+    (j) => j?.data as InterestStatus,
+  );
+
+export const saveInterests = (token: string, categories: number[]) =>
+  ceflix("interests", {
+    method: "POST",
+    body: { token, categories },
+    token,
+  });
+
+export const skipInterests = (token: string) =>
+  ceflix("interests/skip", { method: "POST", body: { token }, token });
+
+// --- Ad earnings (creator side) -------------------------------------------
+
+/** Amounts are integer micro-Espees: a per-view share is a fraction of a cent. */
+export const MICROS = 1_000_000;
+
+export function formatEspees(micros?: number | string | null) {
+  const value = Number(micros ?? 0) / MICROS;
+  // Small balances need the decimals to mean anything; large ones do not.
+  const decimals = value !== 0 && Math.abs(value) < 1 ? 4 : 2;
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+export type ChannelEarnings = {
+  channel_id: number;
+  channel_name: string;
+  has_wallet: boolean;
+  balance_micros: number;
+  lifetime_earned_micros: number;
+  lifetime_paid_micros: number;
+  pending_payout_micros: number;
+};
+
+export type EarningsSummary = {
+  channels: ChannelEarnings[];
+  total_balance_micros: number;
+  total_balance_display: string;
+  creator_share_percent: number;
+  min_payout_micros: number;
+  min_payout_display: string;
+};
+
+export const getEarnings = (token: string) =>
+  ceflix("ads/earnings", { method: "POST", body: { token }, token }).then(
+    (j) => j?.data as EarningsSummary,
+  );
+
+/** Sends a channel's available balance to its Espees wallet. */
+export const requestPayout = (token: string, channelId: number) =>
+  ceflix("ads/earnings/payout", {
+    method: "POST",
+    body: { token, channel: channelId },
+    token,
+  });
+
+// --- Home popup -------------------------------------------------------------
+
+export type HomePopupLanguage = {
+  id: number | string;
+  translation: string;
+  url: string;
+  video_id?: number | null;
+};
+
+export type HomePopup = {
+  id: number;
+  title: string;
+  url: string;
+  thumbnail: string;
+  /** The KingsSpace video behind the popup, if any - views are counted on it. */
+  videoId: number | null;
+  isLive: boolean;
+  languages: HomePopupLanguage[];
+};
+
+/**
+ * The popup the KingsSpace admin has switched on for the home screen, or null.
+ * Same endpoint as the app and website (CeFlix-API docs/home-popup.md).
+ */
+export const getHomePopup = async (): Promise<HomePopup | null> => {
+  const j = await ceflix("home-popup", { token: null });
+  const popup = j?.data;
+  if (!popup?.url) return null;
+
+  return {
+    id: Number(popup.id),
+    title: String(popup.title || "Now Playing"),
+    url: String(popup.url),
+    thumbnail: String(popup.thumbnail || ""),
+    videoId: popup.video_id ? Number(popup.video_id) : null,
+    isLive: Boolean(popup.is_live),
+    languages: (Array.isArray(popup.languages) ? popup.languages : [])
+      .filter((lang: any) => lang?.url && lang?.translation)
+      .map((lang: any, index: number) => ({
+        id: lang.id ?? index,
+        translation: String(lang.translation),
+        url: String(lang.url),
+        video_id: lang.video_id ?? popup.video_id ?? null,
+      })),
+  };
+};
+
+/**
+ * Counts a view: signed-in viewers through `countvideoview`, guests through
+ * the offline counter. Fire-and-forget; a failed count must never surface.
+ */
+export const countVideoView = async (
+  videoId: number | string,
+  language: string | null = null,
+) => {
+  const token = getToken();
+  let email: string | null = null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.user);
+    email = raw ? (JSON.parse(raw)?.email ?? null) : null;
+  } catch {
+    email = null;
+  }
+
+  try {
+    if (token && email) {
+      await ceflix("countvideoview", {
+        method: "POST",
+        body: { email, video: String(videoId), language },
+        token,
+      });
+    } else {
+      await ceflix("video/offline-view-count", {
+        method: "POST",
+        body: {
+          video: String(videoId),
+          device:
+            typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
+        },
+        token: null,
+      });
+    }
+  } catch {
+    /* ignored on purpose */
+  }
+};
 
 export const login = (username: string, password: string) =>
   ceflix("login", { method: "POST", body: { username, password }, token: null });

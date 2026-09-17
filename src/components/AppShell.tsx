@@ -15,6 +15,7 @@ import {
   GridIcon,
 } from "./Icons";
 import { Img } from "./Img";
+import { OnboardingGate } from "./onboarding/OnboardingGate";
 
 const TABS = [
   { href: "/", label: "Home", icon: HomeIcon, match: (p: string) => p === "/" },
@@ -41,10 +42,14 @@ const TABS_RIGHT = [
   },
 ] as const;
 
-// Full-screen immersive routes hide the tab bar (clips + watch behave like the
-// RN app's full-screen players).
+// Full-screen immersive routes hide the tab bar (clips behave like the RN
+// app's full-screen player; onboarding screens stand on their own).
 function isImmersive(path: string) {
-  return path.startsWith("/clips");
+  return (
+    path.startsWith("/clips") ||
+    path.startsWith("/welcome") ||
+    path.startsWith("/interests")
+  );
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -82,6 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col bg-background shadow-[0_0_60px_rgba(0,0,0,0.6)] sm:border-x sm:border-border">
+      <OnboardingGate />
       <main className={immersive ? "flex-1" : "flex-1 pb-[64px]"}>{children}</main>
 
       {!immersive && (

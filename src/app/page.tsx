@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getHome, getNewsPosts } from "@/lib/api";
+import {
+  countVideoView,
+  getHome,
+  getHomePopup,
+  getNewsPosts,
+  type HomePopup,
+} from "@/lib/api";
 import type { HomePayload, HomeSection, Station, VideoItem } from "@/lib/types";
 import { clean, shuffle } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
@@ -12,85 +18,108 @@ import { HomeSkeleton } from "@/components/Skeletons";
 import {
   ClipCard,
   CommunityPostCard,
-  SectionSlider,
-  VideoCard,
+  VideoGridCard,
 } from "@/components/cards";
-import { SearchIcon, VolumeOnIcon, VolumeOffIcon } from "@/components/Icons";
-import { Img } from "@/components/Img";
+import { StationLogoRow } from "@/components/home/StationLogoRow";
+import { HomePopupModal } from "@/components/home/HomePopupModal";
+import { SearchIcon } from "@/components/Icons";
 
-function StationHero({
-  station,
-  autoPlay = false,
-}: {
-  station: Station;
-  autoPlay?: boolean;
-}) {
-  // The first station autoplays muted like the RN app; the rest preview on tap.
-  const [playing, setPlaying] = useState(autoPlay);
-  const [muted, setMuted] = useState(true);
-  return (
-    <div className="shrink-0" style={{ width: 300 }}>
-      <div className="relative h-[168px] w-full overflow-hidden rounded-lg bg-card">
-        {playing && station.src ? (
-          <video
-            src={station.src}
-            className="h-full w-full object-contain"
-            autoPlay
-            muted={muted}
-            loop
-            playsInline
-          />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <Img
-            src={station.imgChannel}
-            alt={station.name}
-            className="h-full w-full object-contain"
-          />
-        )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-        {playing && station.src ? (
-          <button
-            onClick={() => setMuted((m) => !m)}
-            className="absolute bottom-2.5 right-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white"
-            aria-label={muted ? "Unmute" : "Mute"}
-          >
-            {muted ? <VolumeOffIcon size={16} /> : <VolumeOnIcon size={16} />}
-          </button>
-        ) : station.src ? (
-          <button
-            onClick={() => setPlaying(true)}
-            className="absolute bottom-2.5 right-2.5 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white"
-          >
-            Preview
-          </button>
-        ) : null}
-      </div>
-      <div className="mt-3 flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-white">
-          <Img
-            src={station.imgChannel}
-            alt={station.name}
-            className="h-[88%] w-[88%] object-contain"
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-bold">{clean(station.name)}</p>
-          <p className="truncate text-sm text-subtext">
-            {clean(station.desc) || "Live TV Station"}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
+/** Rows a section shows before offering "Show more"; the grid is two across. */
+const GRID_COLUMNS = 2;
+const GRID_INITIAL_ROWS = 3;
 
 type MixedSection = {
-  type: "section" | "clips" | "news";
+  type: "section" | "news";
   key: string;
   title: string;
   data: VideoItem[];
+  /** Renders as tall short-form cards rather than landscape ones. */
+  clips?: boolean;
 };
+
+/**
+ * One home row. Videos are a wrapping two-column grid in the YouTube style
+ * (as in the app) that shows three rows and then offers the rest; clips stay
+ * a horizontal shelf; news posts are full-bleed.
+ */
+function SectionBlock({
+  section,
+  showAll = false,
+}: {
+  section: MixedSection;
+  /** Skip the "Show more" cap - used for the endless block at the bottom. */
+  showAll?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const { data, title } = section;
+  if (!data.length) return null;
+
+  if (section.type === "news") {
+    return (
+      <section className="mt-7 space-y-6">
+        {data.map((item, i) => (
+          <CommunityPostCard key={`${item.id}-${i}`} item={item} />
+        ))}
+      </section>
+    );
+  }
+
+  if (section.clips) {
+    return (
+      <section className="mt-7">
+        <h2 className="mb-2.5 flex items-center gap-1.5 px-3 text-lg font-bold tracking-tight">
+          <span className="text-primary" aria-hidden>
+            ⚡
+          </span>
+          {clean(title)}
+        </h2>
+        <div className="no-scrollbar flex gap-3 overflow-x-auto px-3 pb-1">
+          {data.map((item, i) => (
+            <ClipCard key={`${item.id}-${i}`} item={item} width={132} />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  // Whole rows only, so the grid never ends on a half-filled line.
+  const initialCount = GRID_COLUMNS * GRID_INITIAL_ROWS;
+  const capped = !showAll && !expanded && data.length > initialCount;
+  const visible = capped ? data.slice(0, initialCount) : data;
+  const hiddenCount = data.length - visible.length;
+
+  return (
+    <section className="mt-7">
+      <h2 className="mb-2.5 px-3 text-lg font-bold tracking-tight">
+        {clean(title)}
+      </h2>
+
+      <div className="grid grid-cols-2 gap-x-2.5 gap-y-[18px] px-3">
+        {visible.map((item, i) => (
+          <VideoGridCard key={`${item.id}-${i}`} item={item} />
+        ))}
+      </div>
+
+      {hiddenCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="mx-3 mt-4 flex w-[calc(100%-1.5rem)] items-center justify-center gap-1 rounded-full border border-border py-2 text-sm font-semibold"
+        >
+          Show {hiddenCount} more <span aria-hidden>⌄</span>
+        </button>
+      ) : expanded && !showAll ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="mx-3 mt-4 flex w-[calc(100%-1.5rem)] items-center justify-center gap-1 rounded-full border border-border py-2 text-sm font-semibold"
+        >
+          Show less <span aria-hidden>⌃</span>
+        </button>
+      ) : null}
+    </section>
+  );
+}
 
 export default function HomePage() {
   const { isLoggedIn, token } = useAuth();
@@ -98,7 +127,10 @@ export default function HomePage() {
   // Keyed on the token because the home payload is personalised when one is
   // present — a shared key would serve the previous account's feed.
   const { data: payload, isLoading, error, refetch, isFetching } =
-    useQuery<HomePayload>({ queryKey: ["home", token], queryFn: getHome });
+    useQuery<HomePayload>({
+      queryKey: ["home", token],
+      queryFn: () => getHome(token || ""),
+    });
 
   const { data: newsPosts = [] } = useQuery<VideoItem[]>({
     queryKey: ["news"],
@@ -120,6 +152,31 @@ export default function HomePage() {
     staleTime: 1000 * 60 * 10,
   });
 
+  // ---- Admin-controlled home popup ----
+  // Opens on every load of Home while the admin has one switched on, fetched
+  // fresh each time so a change in the admin applies straight away. Closing it
+  // only closes it for this visit, the same rule as the app and website.
+  const [popup, setPopup] = useState<HomePopup | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getHomePopup()
+      .then((next) => {
+        if (cancelled || !next) return;
+        setPopup(next);
+        // A video-backed popup counts a view when it opens.
+        if (next.videoId) countVideoView(next.videoId, null);
+      })
+      .catch(() => {
+        /* no popup rather than an error over Home */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const stations = useMemo<Station[]>(
     () => (Array.isArray(payload?.stations) ? payload!.stations : []),
     [payload],
@@ -129,6 +186,7 @@ export default function HomePage() {
     // Hide videos from channels the user has blocked (Profile → Blocked).
     const notBlocked = (item: VideoItem) =>
       !isBlocked("channel", item.channel_id || item.channelId);
+
     const sections: HomeSection[] = Array.isArray(payload?.sections)
       ? payload!.sections
           .map((s) => ({
@@ -147,40 +205,47 @@ export default function HomePage() {
     let pi = 0;
     const out: MixedSection[] = [];
 
+    // The API decides which rows appear and in what order - it has already
+    // applied the user's own show/hide and ordering choices - so they render
+    // as given, with news posts threaded through the gaps.
+    const isClipsRow = (s: HomeSection) => s.key === "clips" || s.slug === "clips";
+    const serverSendsClips = sections.some(isClipsRow);
+
     sections.forEach((section) => {
+      const id = section.key || section.slug || section.id;
       out.push({
         type: "section",
-        key: `s-${section.slug || section.id}`,
+        key: `s-${id}`,
         title: section.title,
         data: section.data,
+        clips: isClipsRow(section),
       });
-      const t = clean(section.title).toLowerCase();
-      const slug = String(section.slug ?? "").toLowerCase();
-      if (t.includes("editor") || slug.includes("editor")) {
-        if (ceclips.length)
-          out.push({ type: "clips", key: "clips", title: "Clips", data: ceclips });
-        if (recommended.length)
-          out.push({
-            type: "section",
-            key: "recommended",
-            title: payload?.recommended?.title || "Recommended For You",
-            data: recommended,
-          });
-      }
+
       if (posts.length) {
         const n = Math.floor(Math.random() * 3) + 1;
         const chunk = posts.slice(pi, pi + n);
         if (chunk.length) {
-          out.push({
-            type: "news",
-            key: `news-${section.slug || section.id}`,
-            title: "Latest News",
-            data: chunk,
-          });
+          out.push({ type: "news", key: `news-${id}`, title: "Latest News", data: chunk });
           pi += n;
         }
       }
     });
+
+    // Older API responses have no clips row of their own.
+    if (!serverSendsClips && ceclips.length) {
+      out.push({ type: "section", key: "ceclips", title: "Clips", data: ceclips, clips: true });
+    }
+
+    // The ranked block closes the page, where an endless feed belongs.
+    if (recommended.length) {
+      out.push({
+        type: "section",
+        key: "recommended",
+        title: payload?.recommended?.title || "Recommended For You",
+        data: recommended,
+      });
+    }
+
     return out;
   }, [payload, newsPosts]);
 
@@ -189,12 +254,13 @@ export default function HomePage() {
   return (
     <div className="pb-4 pt-3">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 pb-3">
+      <header className="flex items-center justify-between px-3 pb-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-icon.png" alt="KingsSpace" className="h-9 w-9" />
         {isLoggedIn ? (
           <Link
             href="/browse?tab=search"
+            aria-label="Search"
             className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card"
           >
             <SearchIcon size={22} />
@@ -207,7 +273,7 @@ export default function HomePage() {
       </header>
 
       {error && (
-        <div className="mx-4 rounded-2xl border border-border bg-card p-4">
+        <div className="mx-3 rounded-2xl border border-border bg-card p-4">
           <p className="font-bold">Something went wrong</p>
           <p className="mt-1 text-sm text-subtext">
             {(error as Error).message}
@@ -221,38 +287,17 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Hero stations — hidden for now */}
-      {false && stations.length > 0 && (
-        <div className="no-scrollbar mt-1 flex gap-3.5 overflow-x-auto px-4">
-          {stations.map((s, i) => (
-            <StationHero key={s.id} station={s} autoPlay={i === 0} />
-          ))}
-        </div>
-      )}
+      <StationLogoRow stations={stations} />
 
-      {/* Mixed sections */}
-      {mixed.map((section) => {
-        if (section.type === "news") {
-          return (
-            <section key={section.key} className="mt-7 space-y-6">
-              {section.data.map((item, i) => (
-                <CommunityPostCard key={`${item.id}-${i}`} item={item} />
-              ))}
-            </section>
-          );
-        }
-        return (
-          <SectionSlider key={section.key} title={section.title}>
-            {section.data.map((item, i) =>
-              section.type === "clips" ? (
-                <ClipCard key={`${item.id}-${i}`} item={item} />
-              ) : (
-                <VideoCard key={`${item.id}-${i}`} item={item} />
-              ),
-            )}
-          </SectionSlider>
-        );
-      })}
+      {mixed.map((section) => (
+        <SectionBlock
+          key={section.key}
+          section={section}
+          showAll={section.key === "recommended"}
+        />
+      ))}
+
+      {popup && <HomePopupModal popup={popup} onClose={() => setPopup(null)} />}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { STORAGE_KEYS } from "./config";
 import { login as apiLogin } from "./api";
 import { QUERY_CACHE_STORAGE_KEY } from "./query";
+import { resetInterestsDismissal } from "./onboarding";
 import type { CurrentUser } from "./types";
 
 type AuthContextValue = {
@@ -81,6 +82,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(() => {
     Object.values(STORAGE_KEYS).forEach((k) => localStorage.removeItem(k));
+    // The next account is prompted for interests on its own merits.
+    resetInterestsDismissal();
     // Both caches go too, otherwise the next account sees this one's feed:
     // the in-memory cache survives client-side navigation, and the persisted
     // snapshot survives a full reload.
