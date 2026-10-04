@@ -52,9 +52,10 @@ export default function PlaylistPage({
       <div className="p-4">
         <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-card">
           <Img
+            backdrop
             src={data.thumbnail || videoThumb(videos[0] || {})}
             alt=""
-            className="h-full w-full object-contain"
+            className="h-full w-full"
           />
           <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/80 to-transparent p-3">
             <div>
@@ -78,9 +79,10 @@ export default function PlaylistPage({
             <span className="w-5 text-center text-xs text-subtext">{i + 1}</span>
             <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-lg bg-card">
               <Img
+                backdrop
                 src={videoThumb(v)}
                 alt=""
-                className="h-full w-full object-contain"
+                className="h-full w-full"
               />
               <span className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
                 <PlayIcon size={20} />

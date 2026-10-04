@@ -29,11 +29,21 @@ export function Img({
   alt = "",
   className,
   rounded,
+  backdrop = false,
 }: {
   src?: string | null;
   alt?: string;
   className?: string;
   rounded?: boolean;
+  /**
+   * Video thumbnails: show the whole frame (object-contain) and fill the
+   * leftover band with a blurred, darkened copy of the same image. Matches
+   * the app's Thumbnail. The backdrop reuses the same URL, so the browser
+   * serves it from cache, and is drawn at a quarter size then scaled 4x to
+   * keep the blur cheap. Off by default: avatars, logos, banners and cover
+   * art should keep filling their frame.
+   */
+  backdrop?: boolean;
 }) {
   // Keyed to the src that failed, so a reused element with a new src
   // starts clean.
@@ -56,6 +66,34 @@ export function Img({
           className="h-[34%] max-h-10 w-[34%] max-w-10 object-contain opacity-30"
         />
       </div>
+    );
+  }
+
+  if (backdrop) {
+    return (
+      <span className="relative block h-full w-full overflow-hidden">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src as string}
+            alt=""
+            loading="lazy"
+            className="absolute left-[37.5%] top-[37.5%] h-1/4 w-1/4 scale-[4] object-cover blur-[3px]"
+          />
+          <span className="absolute inset-0 bg-black/25" />
+        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src as string}
+          alt={alt}
+          loading="lazy"
+          className={`relative h-full w-full object-contain ${className || ""}`}
+          onError={() => setFailedSrc(src as string)}
+        />
+      </span>
     );
   }
 

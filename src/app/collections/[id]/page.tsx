@@ -20,11 +20,13 @@ import {
  *
  * There used to be a middle layer - Collection -> Sections -> Playlists - and
  * this page was a grid of section tiles that each opened another page. Now it
- * opens straight onto every playlist in the collection, each with its videos,
- * so "Rhapsody" is one tap from watching rather than two.
+ * opens straight onto every playlist in the collection, each a titled
+ * section with every one of its videos laid out as a two-column grid
+ * underneath - nothing hidden behind a sideways scroll - so "Rhapsody" is
+ * one tap from watching rather than two.
  */
 
-function PlaylistRow({ item }: { item: any }) {
+function PlaylistSection({ item }: { item: any }) {
   const playlist = item?.playlist;
   const videos: any[] = Array.isArray(playlist?.videos) ? playlist.videos : [];
   if (!playlist || videos.length === 0) return null;
@@ -32,7 +34,7 @@ function PlaylistRow({ item }: { item: any }) {
   const playlistId = playlist.id || item.playlist_id;
 
   return (
-    <section className="mb-7">
+    <section className="mb-9">
       <div className="mb-3 flex items-center gap-3 px-4">
         <div className="min-w-0 flex-1">
           <Link href={`/playlist/${playlistId}`}>
@@ -50,22 +52,23 @@ function PlaylistRow({ item }: { item: any }) {
           href={`/playlist/${playlistId}`}
           className="flex shrink-0 items-center text-sm font-semibold"
         >
-          View <span className="ml-0.5 text-base">›</span>
+          Play all <span className="ml-0.5 text-base">›</span>
         </Link>
       </div>
 
-      <div className="no-scrollbar flex gap-3.5 overflow-x-auto px-4">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-[18px] px-4">
         {videos.map((v: any, i: number) => (
           <Link
             key={`${playlistId}-${v.id}-${i}`}
             href={`/watch/${v.id}`}
-            className="block w-[72%] max-w-[330px] shrink-0"
+            className="block min-w-0"
           >
             <div className="relative aspect-video w-full overflow-hidden rounded-[10px] bg-card">
               <Img
+                backdrop
                 src={fixCdn(v.thumbnail)}
                 alt={clean(v.videos_title || v.title)}
-                className="h-full w-full object-cover"
+                className="h-full w-full"
               />
               {String(v.isLive) === "1" && (
                 <span className="absolute bottom-2 left-2 rounded bg-[#dc2626] px-1.5 py-0.5 text-[10px] font-bold text-white">
@@ -73,13 +76,8 @@ function PlaylistRow({ item }: { item: any }) {
                 </span>
               )}
             </div>
-            <div className="mt-2.5 flex gap-2.5">
-              <Img
-                src={fixCdn(v.channel_image)}
-                alt=""
-                className="h-[34px] w-[34px] shrink-0 rounded-full bg-card object-cover"
-              />
-              <div className="min-w-0 flex-1">
+            <div className="mt-2">
+              <div className="min-w-0">
                 <p className="line-clamp-2 text-sm font-medium leading-5">
                   {clean(v.videos_title || v.title || "Untitled")}
                 </p>
@@ -200,7 +198,7 @@ export default function CollectionDetail({
       ) : playlists.length > 0 ? (
         <div className="pt-3">
           {playlists.map((it: any, i: number) => (
-            <PlaylistRow key={`${it.id}-${i}`} item={it} />
+            <PlaylistSection key={`${it.id}-${i}`} item={it} />
           ))}
         </div>
       ) : (

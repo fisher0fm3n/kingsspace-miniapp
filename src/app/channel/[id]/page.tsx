@@ -203,9 +203,10 @@ export default function ChannelPage({
           <Link key={`${v.id}-${i}`} href={`/watch/${v.id}`} className="block">
             <div className="aspect-video w-full overflow-hidden rounded-lg bg-card">
               <Img
+                backdrop
                 src={videoThumb(v)}
                 alt=""
-                className="h-full w-full object-contain"
+                className="h-full w-full"
               />
             </div>
             <p className="mt-2 line-clamp-2 text-sm font-medium">

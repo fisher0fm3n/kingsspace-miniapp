@@ -39,13 +39,34 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
+        // Without this, a server-side failure comes back as Laravel's HTML
+        // error page and the login dies on "Unexpected token '<'".
+        Accept: "application/json",
         "Application-Key": APPLICATION_KEY,
       },
       body: form.toString(),
       cache: "no-store",
     });
 
-    const json = await upstream.json();
+    const raw = await upstream.text();
+    let json: any = null;
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      json = null;
+    }
+
+    // An HTML or empty body is the API falling over for this account, not a
+    // bad login: say so, with the status, so support can tell the two apart.
+    if (!json) {
+      return Response.json(
+        {
+          status: false,
+          message: `KingsSpace could not complete the sign-in (server error ${upstream.status}). Please try again shortly.`,
+        },
+        { status: 502 },
+      );
+    }
     if (!json?.status || !json?.data) {
       const res = NextResponse.json(
         { status: false, message: json?.message || "Failed to authenticate" },

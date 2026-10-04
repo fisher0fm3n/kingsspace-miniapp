@@ -106,3 +106,26 @@ a {
   background: rgba(255, 255, 255, 0.35);
   border-radius: 999px;
 }
+
+/* Watch & Earn: the "+25" that pops beside the balance after a credit. */
+.earn-flash {
+  animation: earn-flash 1.6s ease-out forwards;
+}
+@keyframes earn-flash {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.9);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(1);
+  }
+}

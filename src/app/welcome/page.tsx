@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { markWelcomeSeen } from "@/lib/onboarding";
 import { Spinner } from "@/components/Skeletons";
-import { GridIcon, PlayIcon, UploadIcon, UsersIcon } from "@/components/Icons";
+import { GridIcon, PlayIcon, UploadIcon, UsersIcon, CoinIcon } from "@/components/Icons";
 
 const FEATURES = [
   {
@@ -23,9 +23,14 @@ const FEATURES = [
     body: "Follow the channels you love and their newest videos land in your feed.",
   },
   {
+    icon: <CoinIcon size={22} />,
+    title: "Watch & Earn",
+    body: "Earn Esport while you watch and engage — up to 30 Espees a month — and swap it for Espees.",
+  },
+  {
     icon: <UploadIcon size={22} />,
-    title: "Create and earn",
-    body: "Upload your videos, grow a channel of your own, and earn from the ads on them.",
+    title: "Earn from your content",
+    body: "Upload your videos, grow a channel of your own, and monetise it: ads on your videos pay you in Espees.",
   },
 ];
 

@@ -75,9 +75,10 @@ export default function StudioVideos() {
                 className="relative aspect-video w-36 shrink-0 overflow-hidden rounded-lg bg-card"
               >
                 <Img
+                  backdrop
                   src={fixCdn(v.thumbnail)}
                   alt={clean(v.videos_title)}
-                  className="h-full w-full object-contain"
+                  className="h-full w-full"
                 />
               </Link>
               <div className="flex min-w-0 flex-1 flex-col">

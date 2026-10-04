@@ -14,6 +14,38 @@ import { Spinner } from "@/components/Skeletons";
 import { Img } from "@/components/Img";
 import { UploadIcon, ImageIcon } from "@/components/Icons";
 
+type UploadStatus = "idle" | "uploading" | "done" | "failed";
+
+/** Sends a multipart form through the upload proxy with progress. */
+function postForm(
+  url: string,
+  form: FormData,
+  opts: { onProgress?: (pct: number) => void; signal?: AbortSignal } = {},
+): Promise<{ status: number; json: any }> {
+  return new Promise((resolve, reject) => {
+    // XHR gives real upload progress, which fetch cannot.
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable && opts.onProgress)
+        opts.onProgress(Math.round((ev.loaded * 100) / ev.total));
+    };
+    xhr.onload = () => {
+      let json: any = null;
+      try {
+        json = JSON.parse(xhr.responseText);
+      } catch {
+        json = null;
+      }
+      resolve({ status: xhr.status, json });
+    };
+    xhr.onerror = () => reject(new Error("network"));
+    xhr.onabort = () => reject(new DOMException("aborted", "AbortError"));
+    opts.signal?.addEventListener("abort", () => xhr.abort());
+    xhr.send(form);
+  });
+}
+
 export default function UploadPage() {
   const router = useRouter();
   const { token, isLoggedIn, loading } = useAuth();
@@ -35,8 +67,24 @@ export default function UploadPage() {
   );
   const [declared, setDeclared] = useState(false);
   const [progress, setProgress] = useState(0);
+  /** True while publishing (sending the details). */
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+
+  // The file transfer itself, which starts as soon as a video is chosen so
+  // it runs while the rest of the form is filled in.
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
+  const [uploadError, setUploadError] = useState("");
+  const uploadIdRef = useRef<string | null>(null);
+  const uploadPromiseRef = useRef<Promise<string | null> | null>(null);
+  const uploadAbortRef = useRef<AbortController | null>(null);
+  const publishedRef = useRef(false);
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+
+  // A custom thumbnail is previewed at its own shape, so a 9:16 image is
+  // shown whole rather than cropped into a 16:9 box.
+  const [thumbAspect, setThumbAspect] = useState<number | null>(null);
 
   const videoRef = useRef<HTMLInputElement>(null);
   const thumbRef = useRef<HTMLInputElement>(null);
@@ -78,12 +126,101 @@ export default function UploadPage() {
   const pickThumb = (file: File) => {
     setThumbFile(file);
     setThumbPreview(URL.createObjectURL(file));
+    setThumbAspect(null);
   };
 
-  const submit = (e: React.FormEvent) => {
+  const cancelUpload = (id: string | null) => {
+    const t = tokenRef.current;
+    if (!id || !t) return;
+    const form = new FormData();
+    form.append("token", t);
+    form.append("upload_id", id);
+    fetch("/api/upload?action=cancel", { method: "POST", body: form }).catch(
+      () => {},
+    );
+  };
+
+  /**
+   * Sends the chosen file straight away, while the form is still being
+   * filled in. Publishing later only has to send the details.
+   */
+  const startBackgroundUpload = (file: File): Promise<string | null> => {
+    if (!token) {
+      setUploadStatus("failed");
+      setUploadError("Sign in to upload a video.");
+      return Promise.resolve(null);
+    }
+
+    // A previous file still transferring, or already stored, is dropped so
+    // only the latest one can be published.
+    uploadAbortRef.current?.abort();
+    cancelUpload(uploadIdRef.current);
+    uploadIdRef.current = null;
+
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    setUploadStatus("uploading");
+    setUploadError("");
+    setProgress(0);
+
+    const form = new FormData();
+    form.append("token", token);
+    form.append("file", file, file.name);
+
+    const promise = postForm("/api/upload?action=start", form, {
+      signal: controller.signal,
+      onProgress: setProgress,
+    })
+      .then(({ status, json }) => {
+        const id = json?.data?.upload_id;
+        if (status < 200 || status >= 300 || json?.status === false || !id) {
+          throw new Error(json?.message || `Upload failed (${status}).`);
+        }
+        uploadIdRef.current = String(id);
+        setUploadStatus("done");
+        setProgress(100);
+        return String(id);
+      })
+      .catch((err) => {
+        // Replaced by a newer file: not an error worth showing.
+        if (controller.signal.aborted) return null;
+        setUploadStatus("failed");
+        setUploadError(
+          err?.message === "network"
+            ? "Upload failed. Please check your connection and choose the video again."
+            : err?.message || "Upload failed. Please choose the video again.",
+        );
+        return null;
+      });
+
+    uploadPromiseRef.current = promise;
+    return promise;
+  };
+
+  const pickVideo = (file: File) => {
+    setVideoFile(file);
+    void startBackgroundUpload(file);
+  };
+
+  // Leaving with an unpublished file: stop the transfer and let the server
+  // drop what it already has, so abandoned videos do not pile up.
+  useEffect(
+    () => () => {
+      uploadAbortRef.current?.abort();
+      if (!publishedRef.current) cancelUpload(uploadIdRef.current);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!videoFile) return setError("Please choose a video file.");
+    if (uploadStatus === "failed")
+      return setError(
+        uploadError || "The video upload failed. Please choose the video again.",
+      );
     if (!name.trim()) return setError("Please enter a title.");
     if (!channelId) return setError("Please select a channel to upload to.");
     if (!declared)
@@ -100,52 +237,60 @@ export default function UploadPage() {
     });
     if (!screened.ok) return setError(screened.message);
 
-    const form = new FormData();
-    form.append("video_title", name.trim());
-    form.append("description", description.trim());
-    form.append("tags", tags.trim());
-    form.append("startDate", Math.floor(Date.now() / 1000).toString());
-    form.append("privacy", privacy);
-    form.append("token", token);
-    form.append("channel", channelId);
-    form.append("type", "video");
-    form.append("is_short", isShort ? "yes" : "no");
-    // Uploader-declared audience rating. KingsChat's App Store rating is 16+,
-    // so nothing above "16+" can be declared or published.
-    form.append("content_rating", contentRating);
-    form.append("age_declaration", "16plus_confirmed");
-    if (thumbFile) form.append("thumbnail", thumbFile, thumbFile.name);
-    form.append("file", videoFile, videoFile.name);
-
     setUploading(true);
-    setProgress(0);
 
-    // XHR gives real upload progress, which fetch cannot.
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/upload");
-    xhr.upload.onprogress = (ev) => {
-      if (ev.lengthComputable)
-        setProgress(Math.round((ev.loaded * 100) / ev.total));
-    };
-    xhr.onload = () => {
-      setUploading(false);
-      let json: any = null;
-      try {
-        json = JSON.parse(xhr.responseText);
-      } catch {
-        json = null;
+    try {
+      // Usually already done by now. If the file is still transferring, wait
+      // for it rather than making the uploader come back later.
+      let id = uploadIdRef.current;
+      if (!id && uploadPromiseRef.current) id = await uploadPromiseRef.current;
+      if (!id) {
+        setError(
+          uploadError ||
+            "The video upload did not finish. Please choose the video again.",
+        );
+        return;
       }
-      if (xhr.status >= 200 && xhr.status < 300 && json?.status !== false) {
+
+      const form = new FormData();
+      form.append("token", token);
+      form.append("upload_id", id);
+      form.append("video_title", name.trim());
+      form.append("description", description.trim());
+      form.append("tags", tags.trim());
+      form.append("startDate", Math.floor(Date.now() / 1000).toString());
+      form.append("privacy", privacy);
+      form.append("channel", channelId);
+      form.append("is_short", isShort ? "yes" : "no");
+      // Uploader-declared audience rating. KingsChat's App Store rating is 16+,
+      // so nothing above "16+" can be declared or published.
+      form.append("content_rating", contentRating);
+      form.append("age_declaration", "16plus_confirmed");
+      if (thumbFile) form.append("thumbnail", thumbFile, thumbFile.name);
+
+      const { status, json } = await postForm(
+        "/api/upload?action=publish",
+        form,
+      );
+
+      if (status >= 200 && status < 300 && json?.status !== false) {
+        publishedRef.current = true;
         router.replace(`/channel/${channelId}`);
-      } else {
-        setError(json?.message || `Upload failed (${xhr.status}).`);
+        return;
       }
-    };
-    xhr.onerror = () => {
+
+      // The stored file is gone (cancelled, already used, or expired): the
+      // only way forward is to choose the video again.
+      if (status === 404) {
+        uploadIdRef.current = null;
+        setUploadStatus("failed");
+      }
+      setError(json?.message || `Publishing failed (${status}).`);
+    } catch {
+      setError("Publishing failed. Please try again.");
+    } finally {
       setUploading(false);
-      setError("Upload failed. Please try again.");
-    };
-    xhr.send(form);
+    }
   };
 
   if (!loading && !isLoggedIn)
@@ -208,7 +353,7 @@ export default function UploadPage() {
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) setVideoFile(f);
+              if (f) pickVideo(f);
             }}
           />
         </button>
@@ -219,9 +364,41 @@ export default function UploadPage() {
           </p>
         )}
         {videoFile && (
-          <p className="-mt-2 truncate text-xs text-subtext">
-            {videoFile.name}
-          </p>
+          <div className="-mt-2 space-y-1.5">
+            <p className="truncate text-xs text-subtext">{videoFile.name}</p>
+
+            {uploadStatus === "uploading" && (
+              <>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-card">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-subtext">
+                  Uploading… {progress}% — keep filling in the details, you can
+                  publish as soon as it finishes.
+                </p>
+              </>
+            )}
+            {uploadStatus === "done" && (
+              <p className="text-xs font-semibold text-primary">
+                Video uploaded — ready to publish.
+              </p>
+            )}
+            {uploadStatus === "failed" && (
+              <p className="text-xs text-error">
+                {uploadError}{" "}
+                <button
+                  type="button"
+                  onClick={() => startBackgroundUpload(videoFile)}
+                  className="font-semibold underline"
+                >
+                  Retry
+                </button>
+              </p>
+            )}
+          </div>
         )}
 
         <div>
@@ -312,19 +489,26 @@ export default function UploadPage() {
           <button
             type="button"
             onClick={() => thumbRef.current?.click()}
-            className="relative flex aspect-video w-full max-w-[220px] items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-card"
+            className="relative flex w-full max-w-[220px] items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-card"
+            style={{ aspectRatio: thumbAspect ?? 16 / 9 }}
           >
             {thumbPreview ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={thumbPreview}
                 alt=""
-                className="h-full w-full object-cover"
+                onLoad={(e) => {
+                  const img = e.currentTarget;
+                  if (img.naturalWidth && img.naturalHeight)
+                    setThumbAspect(img.naturalWidth / img.naturalHeight);
+                }}
+                className="h-full w-full object-contain"
               />
             ) : (
               <span className="flex flex-col items-center gap-1.5 text-subtext">
                 <ImageIcon size={22} />
                 <span className="text-xs font-semibold">Add thumbnail</span>
+                <span className="text-[10px]">16:9 or 9:16, kept whole</span>
               </span>
             )}
             <input
@@ -441,27 +625,19 @@ export default function UploadPage() {
 
         {error && <p className="text-sm text-error">{error}</p>}
 
-        {uploading ? (
-          <div className="space-y-2">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-card">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <p className="text-center text-sm text-subtext">
-              Uploading… {progress}%
-            </p>
-          </div>
-        ) : (
-          <button
-            type="submit"
-            disabled={channels.length === 0}
-            className="w-full rounded-xl bg-primary py-3 font-bold text-white disabled:opacity-60"
-          >
-            Publish
-          </button>
-        )}
+        <button
+          type="submit"
+          disabled={channels.length === 0 || uploading}
+          className="w-full rounded-xl bg-primary py-3 font-bold text-white disabled:opacity-60"
+        >
+          {uploading
+            ? uploadStatus === "uploading"
+              ? `Finishing upload… ${progress}%`
+              : "Publishing…"
+            : uploadStatus === "uploading"
+              ? "Publish when upload finishes"
+              : "Publish"}
+        </button>
       </form>
     </div>
   );

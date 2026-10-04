@@ -1,5 +1,6 @@
 // Typed client for the KingsSpace backend, routed through the Next.js proxies.
 import { STORAGE_KEYS } from "./config";
+import type { WatchEarnEngagementResult } from "./watchEarn";
 
 export function getToken(): string {
   if (typeof window === "undefined") return "";
@@ -342,7 +343,20 @@ export const getDiscovery = async (excludeChannelIds: string[] = []) => {
   return { trending, channels };
 };
 
-export const likeVideo = (videoId: string | number, token: string) =>
+/**
+ * `{status, liked, watch_earn, token}` - the server awards the Watch & Earn
+ * like itself; `watch_earn` carries `{awarded_esport, reason, balance_esport}`,
+ * `{reversed}` on an unlike, or null if the hook failed.
+ */
+export const likeVideo = (
+  videoId: string | number,
+  token: string,
+): Promise<{
+  status: boolean;
+  liked: boolean;
+  watch_earn: WatchEarnEngagementResult | null;
+  token?: string;
+}> =>
   ceflix("user/video/like", {
     method: "POST",
     body: { video: videoId, token },
@@ -356,11 +370,16 @@ export const subscribeChannel = (channelId: string | number, token: string) =>
     token,
   });
 
+/** `{status, message, watch_earn}` - the comment award, as for `likeVideo`. */
 export const addComment = (
   videoId: string | number,
   comment: string,
   token: string,
-) =>
+): Promise<{
+  status: boolean;
+  message?: string;
+  watch_earn: WatchEarnEngagementResult | null;
+}> =>
   ceflix("video/comment/add", {
     method: "POST",
     body: { video: videoId, comment, token },

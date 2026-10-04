@@ -58,7 +58,7 @@ export function VideoShelfCard({ item }: { item: any }) {
   return (
     <Link href={libraryVideoHref(item)} className="block w-[42%] max-w-[210px] shrink-0">
       <div className="aspect-video w-full overflow-hidden rounded-xl bg-card">
-        <Img src={fixCdn(item?.thumbnail)} alt="" className="h-full w-full object-cover" />
+        <Img backdrop src={fixCdn(item?.thumbnail)} alt="" className="h-full w-full" />
       </div>
       <p className="mt-2 line-clamp-2 text-[13.5px] font-medium leading-[18px]">
         {videoTitleOf(item)}
@@ -78,9 +78,10 @@ export function PlaylistShelfCard({ item }: { item: any }) {
     >
       <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-card">
         <Img
+          backdrop
           src={fixCdn(item?.playlist_thumbnail)}
           alt=""
-          className="h-full w-full object-cover"
+          className="h-full w-full"
         />
         {count > 0 && <PlaylistCountBadge count={count} />}
       </div>
@@ -102,7 +103,7 @@ export function VideoListRow({ item }: { item: any }) {
       className="flex items-start gap-3 px-4 py-2 active:bg-card"
     >
       <div className="aspect-video w-[148px] shrink-0 overflow-hidden rounded-[10px] bg-card">
-        <Img src={fixCdn(item?.thumbnail)} alt="" className="h-full w-full object-cover" />
+        <Img backdrop src={fixCdn(item?.thumbnail)} alt="" className="h-full w-full" />
       </div>
       <div className="min-w-0 flex-1 pt-0.5">
         <p className="line-clamp-2 text-[14.5px] font-medium leading-5">
@@ -124,9 +125,10 @@ export function PlaylistListRow({ item }: { item: any }) {
     >
       <div className="relative aspect-video w-[148px] shrink-0 overflow-hidden rounded-[10px] bg-card">
         <Img
+          backdrop
           src={fixCdn(item?.playlist_thumbnail)}
           alt=""
-          className="h-full w-full object-cover"
+          className="h-full w-full"
         />
         {count > 0 && <PlaylistCountBadge count={count} />}
       </div>

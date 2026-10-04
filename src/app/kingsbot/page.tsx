@@ -105,9 +105,10 @@ export default function KingsBotPage() {
                   >
                     <div className="aspect-video w-full overflow-hidden rounded-lg bg-card">
                       <Img
+                        backdrop
                         src={videoThumb(v)}
                         alt=""
-                        className="h-full w-full object-contain"
+                        className="h-full w-full"
                       />
                     </div>
                     <p className="mt-1 line-clamp-2 text-xs font-medium">

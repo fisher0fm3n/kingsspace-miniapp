@@ -3,13 +3,35 @@ import { APPLICATION_KEY, CEFLIX_API } from "@/lib/config";
 
 // Multipart video upload proxy. The generic ceflix proxy forwards bodies as
 // text/JSON, which corrupts binary uploads — so video uploads go through here,
-// preserving the multipart form (video file + thumbnail) and attaching the
-// Application-Key / X-TOKEN headers. Mirrors the RN app's POST /video/upload.
+// preserving the multipart form and attaching the Application-Key / X-TOKEN
+// headers.
+//
+// Uploads happen in two phases (see CeFlix-API docs/uploads.md): the file is
+// sent the moment it is chosen (`?action=start`), the details follow when the
+// form is complete (`?action=publish`), and a replaced or abandoned file is
+// dropped (`?action=cancel`). With no action the legacy one-shot
+// POST /video/upload is forwarded as before.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+const UPSTREAM_PATHS: Record<string, string> = {
+  start: "/video/upload/start",
+  publish: "/video/upload/publish",
+  cancel: "/video/upload/cancel",
+};
+
 export async function POST(req: NextRequest) {
+  const action = req.nextUrl.searchParams.get("action") || "";
+  const upstreamPath = action ? UPSTREAM_PATHS[action] : "/video/upload";
+
+  if (!upstreamPath) {
+    return Response.json(
+      { status: false, message: "Unknown upload action" },
+      { status: 400 },
+    );
+  }
+
   let form: FormData;
   try {
     form = await req.formData();
@@ -30,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Re-send the multipart form untouched (fetch sets the boundary itself).
-    const upstream = await fetch(`${CEFLIX_API}/video/upload`, {
+    const upstream = await fetch(`${CEFLIX_API}${upstreamPath}`, {
       method: "POST",
       headers: {
         "Application-Key": APPLICATION_KEY,

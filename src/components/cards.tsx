@@ -34,9 +34,10 @@ export function VideoCard({
     <Link href={videoHref(item)} className="block shrink-0" style={{ width }}>
       <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-card">
         <Thumb
+          backdrop
           src={videoThumb(item)}
           alt={videoTitle(item)}
-          className="h-full w-full object-contain"
+          className="h-full w-full"
         />
         {Number(item.isLive) === 1 && (
           <span className="absolute left-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-bold text-primary">
@@ -91,9 +92,10 @@ export function VideoGridCard({ item }: { item: VideoItem }) {
     <Link href={videoHref(item)} className="block min-w-0">
       <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-card">
         <Thumb
+          backdrop
           src={videoThumb(item)}
           alt={videoTitle(item)}
-          className="h-full w-full object-cover"
+          className="h-full w-full"
         />
         {Number(item.isLive) === 1 && (
           <span className="absolute bottom-1.5 left-1.5 rounded bg-error px-1.5 py-0.5 text-[10px] font-bold text-white">
@@ -143,9 +145,10 @@ export function ClipCard({ item, width = 150 }: { item: VideoItem; width?: numbe
         style={{ height: width * 1.55 }}
       >
         <Thumb
+          backdrop
           src={videoThumb(item)}
           alt={videoTitle(item)}
-          className="h-full w-full object-cover"
+          className="h-full w-full"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
         <p className="absolute inset-x-2.5 bottom-3 line-clamp-2 text-xs font-bold text-white">

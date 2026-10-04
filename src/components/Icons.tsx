@@ -223,3 +223,21 @@ export const VerifiedIcon = ({ size, ...p }: P) => (
     <path d="m12 1.5 2.4 1.9 3-.3 1 2.9 2.7 1.4-.9 2.9L23 14l-1.8 2.3.9 2.9-2.7 1.4-1 2.9-3-.3L12 25l-2.4-2.4-3 .3-1-2.9-2.7-1.4.9-2.9L1 14l1.8-2.3-.9-2.9L4.6 7l1-2.9 3 .3z" />
   </svg>
 );
+
+/** Watch & Earn Esport. */
+export const CoinIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5" />
+    <path d="M12 9.5v5M10.5 11h2.25a1 1 0 0 1 0 2H10.5" />
+  </svg>
+);
+
+/** Espees wallet. */
+export const WalletIcon = ({ size, ...p }: P) => (
+  <svg {...base(size)} {...p}>
+    <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H18a1 1 0 0 1 1 1v2" />
+    <path d="M3 7.5V17a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z" />
+    <circle cx="16.5" cy="13.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);

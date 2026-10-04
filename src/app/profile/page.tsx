@@ -18,12 +18,18 @@ import {
   type LibrarySection,
 } from "@/lib/library";
 import { clean } from "@/lib/utils";
+import {
+  formatEsport,
+  getWatchEarnWallet,
+  watchEarnWalletKey,
+} from "@/lib/watchEarn";
 import { Spinner } from "@/components/Skeletons";
 import { EmptyState } from "@/components/EmptyState";
 import { Img } from "@/components/Img";
 import { PlaylistShelfCard, VideoShelfCard } from "@/components/library";
 import {
   ClockIcon,
+  CoinIcon,
   HeartIcon,
   PlaylistIcon,
   TvIcon,
@@ -160,6 +166,15 @@ export default function ProfilePage() {
     retry: false,
   });
 
+  // Same for the Watch & Earn wallet: a missing endpoint just hides the value.
+  const { data: wallet } = useQuery({
+    queryKey: watchEarnWalletKey(token),
+    queryFn: () => getWatchEarnWallet(token),
+    enabled,
+    retry: false,
+    staleTime: 1000 * 30,
+  });
+
   if (loading)
     return (
       <div className="flex justify-center p-10">
@@ -253,6 +268,12 @@ export default function ProfilePage() {
 
       {/* -------------------------------------------------------- options */}
       <Divider />
+      <Row
+        href="/wallet"
+        icon={<CoinIcon size={20} />}
+        label="Watch & Earn wallet"
+        value={wallet ? `${formatEsport(wallet.balance_esport)} Esport` : undefined}
+      />
       <Row
         href="/studio/earnings"
         label="Ad earnings"

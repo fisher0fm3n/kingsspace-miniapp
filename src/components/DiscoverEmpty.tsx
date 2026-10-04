@@ -226,9 +226,10 @@ function TrendingTile({ item, full }: { item: VideoItem; full: boolean }) {
         }`}
       >
         <Img
+          backdrop
           src={fixCdn(item.imgUrl || item.thumbnail)}
           alt={clean(item.title)}
-          className="h-full w-full object-cover"
+          className="h-full w-full"
         />
       </div>
 

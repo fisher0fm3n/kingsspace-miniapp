@@ -81,9 +81,10 @@ function FeedVideoCard({ item }: { item: any }) {
     <Link href={href} className="block">
       <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-card">
         <Img
+          backdrop
           src={fixCdn(item.thumbnail)}
           alt={clean(item.videos_title)}
-          className="h-full w-full object-cover"
+          className="h-full w-full"
         />
         {String(item.isLive) === "1" && (
           <span className="absolute bottom-2 left-2 rounded bg-error px-1.5 py-0.5 text-[11px] font-bold text-white">
@@ -263,7 +264,7 @@ function SearchResultRow({ result }: { result: SearchResult }) {
         className="flex gap-3"
       >
         <div className="aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-card">
-          <Img src={thumb} alt="" className="h-full w-full object-cover" />
+          <Img backdrop src={thumb} alt="" className="h-full w-full" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-sm font-medium">{clean(title)}</p>
@@ -285,9 +286,10 @@ function SearchResultRow({ result }: { result: SearchResult }) {
     <Link href={`/watch/${data.videoId}`} className="flex gap-3">
       <div className="aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-card">
         <Img
+          backdrop
           src={data.thumbnail}
           alt=""
-          className="h-full w-full object-cover"
+          className="h-full w-full"
         />
       </div>
       <div className="min-w-0 flex-1">

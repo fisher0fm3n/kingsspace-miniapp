@@ -83,9 +83,10 @@ export function CollectionPlaylistSearch({ term }: { term: string }) {
           >
             <div className="relative aspect-video w-[136px] shrink-0 overflow-hidden rounded-lg bg-card">
               <Img
+                backdrop
                 src={fixCdn(result.thumbnail)}
                 alt=""
-                className="h-full w-full object-cover"
+                className="h-full w-full"
               />
               <VideoCountTag
                 count={result.video_count}
