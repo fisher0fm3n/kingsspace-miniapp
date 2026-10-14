@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { markWelcomeSeen } from "@/lib/onboarding";
 import { Spinner } from "@/components/Skeletons";
-import { GridIcon, PlayIcon, UploadIcon, UsersIcon, CoinIcon } from "@/components/Icons";
+import { GridIcon, PlayIcon, UploadIcon, UsersIcon } from "@/components/Icons";
 
 const FEATURES = [
   {
@@ -23,14 +23,9 @@ const FEATURES = [
     body: "Follow the channels you love and their newest videos land in your feed.",
   },
   {
-    icon: <CoinIcon size={22} />,
-    title: "Watch & Earn",
-    body: "Earn Esport while you watch and engage — up to 30 Espees a month — and swap it for Espees.",
-  },
-  {
     icon: <UploadIcon size={22} />,
-    title: "Earn from your content",
-    body: "Upload your videos, grow a channel of your own, and monetise it: ads on your videos pay you in Espees.",
+    title: "Share your content",
+    body: "Upload your videos and grow a channel of your own.",
   },
 ];
 
@@ -102,7 +97,7 @@ export default function WelcomePage() {
           {leaving === "explore" ? <Spinner size={18} /> : "Explore without an account"}
         </button>
         <p className="text-center text-xs leading-5 text-subtext">
-          Signing in unlocks following, comments, uploads and earnings. You can
+          Signing in unlocks following, comments and uploads. You can
           do it any time from the You tab.
         </p>
       </div>

@@ -18,9 +18,8 @@ the core experience as a mobile-first web app.
 | Channel | `/channel/[id]` | Cover, avatar, subscribe, video grid. |
 | Playlist | `/playlist/[id]` | Ordered playlist with play-through links. |
 | KingsBot AI | `/kingsbot` | Chat UI backed by the `kingsspace/search/ask` endpoint, renders suggested videos. |
-| Profile | `/profile`, `/library/[section]` | Identity, creator shortcuts, ad earnings, shelves of your videos / playlists / likes / history with "View all" pages, settings & legal links, sign out. |
+| Profile | `/profile`, `/library/[section]` | Identity, creator shortcuts, shelves of your videos / playlists / likes / history with "View all" pages, settings & legal links, sign out. |
 | Onboarding | `/welcome`, `/interests` | First-visit welcome for signed-out visitors; interests picker for signed-in users with none saved (skippable per session; `?mode=edit` from the You tab). |
-| Ad earnings | `/studio/earnings` | Per-channel ad earnings and withdrawal to the channel's Espees wallet. |
 | Auth | `/login`, `/auth/callback` | Username/password login **and** KingsChat auth (launch `authCode` → server-side exchange; legacy web OAuth fallback). |
 | Upload | `/upload` | Auth-gated upload (Gallery/Files only inside the KingsChat webview), content-rating + 16+ declaration, text moderation screen. |
 | Legal | `/legal/terms`, `/legal/privacy` | Terms of Use (content rules, prohibited content, moderation/takedowns/bans/termination) and Privacy Policy (data, retention, deletion, consent). |

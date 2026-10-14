@@ -55,20 +55,8 @@ import {
   QualityModal,
   ReportModal,
 } from "@/components/watch/WatchModals";
-import { EarnCard } from "@/components/watchEarn/EarnCard";
-import { TermsSheet } from "@/components/watchEarn/TermsSheet";
-import { useWatchEarnReporter } from "@/components/watchEarn/useWatchEarnReporter";
-import {
-  engageWatchEarn,
-  type WatchEarnEngagementAction,
-  type WatchEarnEngagementResult,
-  type WatchEarnToday,
-  type WatchEarnVideoProgress,
-} from "@/lib/watchEarn";
 
 const AUTOPLAY_KEY = "kingsspace.watch.autoplay";
-/** "Not now" on the rules sheet keeps it closed for the rest of this visit. */
-const TERMS_DISMISSED_KEY = "kingsspace.earn.terms.dismissed";
 /** How long the overlay buttons stay up after a tap or once playback starts. */
 const CONTROLS_HIDE_MS = 3500;
 const DEFAULT_AVATAR = "https://ceflix.org/images/avatar.png";
@@ -247,54 +235,6 @@ export default function WatchPage({
   // old one left off instead of restarting.
   const resumeRef = useRef<{ time: number; wasPlaying: boolean } | null>(null);
 
-  // Watch & Earn. Live items play on their own page, but the item itself can
-  // still say it is live; those never earn, nor do signed-out viewers. The
-  // flag only turns on once the <video> is on screen so the reporter finds it.
-  const isLiveItem = Number(video?.isLive) === 1;
-  const earn = useWatchEarnReporter({
-    videoId: id,
-    token,
-    enabled: isLoggedIn && Boolean(video) && Boolean(src) && !isLiveItem,
-    videoRef,
-  });
-  // Engagement results (like / comment / share) go into the card only: an
-  // award flashes "+10" there, anything that pays nothing stays silent.
-  const { applyEngagement } = earn;
-  const notifyEarn = useCallback(
-    (
-      action: WatchEarnEngagementAction,
-      result: WatchEarnEngagementResult | null | undefined,
-      extra?: { today?: WatchEarnToday; video?: WatchEarnVideoProgress | null },
-    ) => {
-      if (!result || typeof result !== "object") return;
-      applyEngagement(action, result, extra);
-    },
-    [applyEngagement],
-  );
-
-  // The rules sheet: Watch & Earn is opt-in, so it opens when session/start
-  // answers `terms_required` for a signed-in viewer (no session exists until
-  // they accept). "Not now" keeps it closed for the visit and leaves the
-  // card's invitation showing; accepting starts the session for this video.
-  const [termsOpen, setTermsOpen] = useState(false);
-  const earnTerms = earn.terms;
-  const earnReason = earn.reason;
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    const unaccepted = earnReason === "terms_required" || (earnTerms != null && !earnTerms.accepted);
-    if (!unaccepted) return;
-    try {
-      if (sessionStorage.getItem(TERMS_DISMISSED_KEY) === String(earnTerms?.version ?? 0)) return;
-    } catch {}
-    setTermsOpen(true);
-  }, [isLoggedIn, earnTerms, earnReason]);
-  const dismissTerms = () => {
-    try {
-      sessionStorage.setItem(TERMS_DISMISSED_KEY, String(earnTerms?.version ?? 0));
-    } catch {}
-    setTermsOpen(false);
-  };
-
   useEffect(() => {
     const el = videoRef.current;
     if (!el || !src) return;
@@ -355,7 +295,6 @@ export default function WatchPage({
     try {
       const res = await likeVideo(id, token);
       if (typeof res?.liked === "boolean") setLiked(res.liked);
-      notifyEarn("like", res?.watch_earn);
     } catch {
       setLiked((v) => !v);
     }
@@ -386,10 +325,9 @@ export default function WatchPage({
     }
     setPosting(true);
     try {
-      const res = await addComment(id, text, token);
+      await addComment(id, text, token);
       setCommentText("");
       refetchComments();
-      notifyEarn("comment", res?.watch_earn);
     } finally {
       setPosting(false);
     }
@@ -560,19 +498,6 @@ export default function WatchPage({
               if (!navigator.share) return;
               navigator
                 .share({ title: videoTitle(video), url: location.href })
-                .then(() => {
-                  // The share went out: claim it. Likes and comments are
-                  // awarded by their own endpoints; only a share is claimed.
-                  if (!isLoggedIn || isLiveItem) return;
-                  engageWatchEarn(token, id, "share")
-                    .then((r) =>
-                      notifyEarn("share", r, {
-                        today: r?.today,
-                        video: r?.video,
-                      }),
-                    )
-                    .catch(() => {});
-                })
                 .catch(() => {});
             }}
             className="flex items-center gap-1.5 rounded-full bg-card px-4 py-2 text-sm font-semibold"
@@ -627,13 +552,6 @@ export default function WatchPage({
           >
             {expanded ? "Show less" : "Show more"}
           </button>
-        </div>
-      )}
-
-      {/* Watch & Earn: balance plus whether this moment counts. */}
-      {!isLiveItem && (
-        <div className={`px-4 pb-3 ${video.description ? "" : "pt-3"}`}>
-          <EarnCard state={earn} signedIn={isLoggedIn} />
         </div>
       )}
 
@@ -776,17 +694,6 @@ export default function WatchPage({
           targetId={commentReportId}
           token={token}
           onClose={() => setCommentReportId(null)}
-        />
-      )}
-
-      {termsOpen && isLoggedIn && (
-        <TermsSheet
-          token={token}
-          onAccepted={(terms) => {
-            earn.markTermsAccepted(terms);
-            setTermsOpen(false);
-          }}
-          onClose={dismissTerms}
         />
       )}
     </div>

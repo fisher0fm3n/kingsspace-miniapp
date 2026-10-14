@@ -4,12 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import {
-  formatEspees,
-  getAccountStats,
-  getEarnings,
-  getUserChannels,
-} from "@/lib/api";
+import { getAccountStats, getUserChannels } from "@/lib/api";
 import {
   LIBRARY_TITLES,
   fetchLibrary,
@@ -18,18 +13,12 @@ import {
   type LibrarySection,
 } from "@/lib/library";
 import { clean } from "@/lib/utils";
-import {
-  formatEsport,
-  getWatchEarnWallet,
-  watchEarnWalletKey,
-} from "@/lib/watchEarn";
 import { Spinner } from "@/components/Skeletons";
 import { EmptyState } from "@/components/EmptyState";
 import { Img } from "@/components/Img";
 import { PlaylistShelfCard, VideoShelfCard } from "@/components/library";
 import {
   ClockIcon,
-  CoinIcon,
   HeartIcon,
   PlaylistIcon,
   TvIcon,
@@ -157,24 +146,6 @@ export default function ProfilePage() {
     enabled,
   });
 
-  // Earnings must never break the profile: the endpoint is newer than the
-  // rest and may be missing in some environments.
-  const { data: earnings } = useQuery({
-    queryKey: ["earnings", token],
-    queryFn: () => getEarnings(token),
-    enabled,
-    retry: false,
-  });
-
-  // Same for the Watch & Earn wallet: a missing endpoint just hides the value.
-  const { data: wallet } = useQuery({
-    queryKey: watchEarnWalletKey(token),
-    queryFn: () => getWatchEarnWallet(token),
-    enabled,
-    retry: false,
-    staleTime: 1000 * 30,
-  });
-
   if (loading)
     return (
       <div className="flex justify-center p-10">
@@ -268,17 +239,6 @@ export default function ProfilePage() {
 
       {/* -------------------------------------------------------- options */}
       <Divider />
-      <Row
-        href="/wallet"
-        icon={<CoinIcon size={20} />}
-        label="Watch & Earn wallet"
-        value={wallet ? `${formatEsport(wallet.balance_esport)} Esport` : undefined}
-      />
-      <Row
-        href="/studio/earnings"
-        label="Ad earnings"
-        value={earnings ? `${formatEspees(earnings.total_balance_micros)} Espees` : undefined}
-      />
       <Row
         href="/studio/channels"
         icon={<TvIcon size={20} />}

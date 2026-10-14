@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Manual "Continue with KingsChat" login target (mirrors the EspeesMax
-// miniapp). accounts.kingsch.at is opened with `post_redirect=true`, so it
+// Manual "Continue with KingsChat" login target. accounts.kingsch.at is
+// opened with `post_redirect=true`, so it
 // POSTs the accessToken/refreshToken here (form-encoded) instead of
 // redirecting with a code. The tokens are parked in short-lived httpOnly
 // cookies and the browser is bounced to /auth/callback, which completes the

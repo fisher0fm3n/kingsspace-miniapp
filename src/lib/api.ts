@@ -1,6 +1,5 @@
 // Typed client for the KingsSpace backend, routed through the Next.js proxies.
 import { STORAGE_KEYS } from "./config";
-import type { WatchEarnEngagementResult } from "./watchEarn";
 
 export function getToken(): string {
   if (typeof window === "undefined") return "";
@@ -343,18 +342,13 @@ export const getDiscovery = async (excludeChannelIds: string[] = []) => {
   return { trending, channels };
 };
 
-/**
- * `{status, liked, watch_earn, token}` - the server awards the Watch & Earn
- * like itself; `watch_earn` carries `{awarded_esport, reason, balance_esport}`,
- * `{reversed}` on an unlike, or null if the hook failed.
- */
+/** `{status, liked, token}` */
 export const likeVideo = (
   videoId: string | number,
   token: string,
 ): Promise<{
   status: boolean;
   liked: boolean;
-  watch_earn: WatchEarnEngagementResult | null;
   token?: string;
 }> =>
   ceflix("user/video/like", {
@@ -370,7 +364,7 @@ export const subscribeChannel = (channelId: string | number, token: string) =>
     token,
   });
 
-/** `{status, message, watch_earn}` - the comment award, as for `likeVideo`. */
+/** `{status, message}` */
 export const addComment = (
   videoId: string | number,
   comment: string,
@@ -378,7 +372,6 @@ export const addComment = (
 ): Promise<{
   status: boolean;
   message?: string;
-  watch_earn: WatchEarnEngagementResult | null;
 }> =>
   ceflix("video/comment/add", {
     method: "POST",
@@ -687,53 +680,6 @@ export const saveInterests = (token: string, categories: number[]) =>
 
 export const skipInterests = (token: string) =>
   ceflix("interests/skip", { method: "POST", body: { token }, token });
-
-// --- Ad earnings (creator side) -------------------------------------------
-
-/** Amounts are integer micro-Espees: a per-view share is a fraction of a cent. */
-export const MICROS = 1_000_000;
-
-export function formatEspees(micros?: number | string | null) {
-  const value = Number(micros ?? 0) / MICROS;
-  // Small balances need the decimals to mean anything; large ones do not.
-  const decimals = value !== 0 && Math.abs(value) < 1 ? 4 : 2;
-  return value.toLocaleString(undefined, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
-
-export type ChannelEarnings = {
-  channel_id: number;
-  channel_name: string;
-  has_wallet: boolean;
-  balance_micros: number;
-  lifetime_earned_micros: number;
-  lifetime_paid_micros: number;
-  pending_payout_micros: number;
-};
-
-export type EarningsSummary = {
-  channels: ChannelEarnings[];
-  total_balance_micros: number;
-  total_balance_display: string;
-  creator_share_percent: number;
-  min_payout_micros: number;
-  min_payout_display: string;
-};
-
-export const getEarnings = (token: string) =>
-  ceflix("ads/earnings", { method: "POST", body: { token }, token }).then(
-    (j) => j?.data as EarningsSummary,
-  );
-
-/** Sends a channel's available balance to its Espees wallet. */
-export const requestPayout = (token: string, channelId: number) =>
-  ceflix("ads/earnings/payout", {
-    method: "POST",
-    body: { token, channel: channelId },
-    token,
-  });
 
 // --- Home popup -------------------------------------------------------------
 
